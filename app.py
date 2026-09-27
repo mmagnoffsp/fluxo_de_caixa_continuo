@@ -22,8 +22,8 @@ class AppFluxoCaixa:
 
   def __init__(self, root):
     self.root = root
-    self.root.title("Fluxo de Caixa Contínuo")
-    self.root.geometry("1150x1000")
+    self.root.title("Fluxo de Caixa Contínuo - Saldo por Lote de Crédito")
+    self.root.geometry("1200x1020")
     self.root.config(bg="#f0f0f0")
 
     # Variáveis para controle das máscaras e edição
@@ -68,6 +68,7 @@ class AppFluxoCaixa:
         "IRPF RECEBIDO",
         "SALDO IRPF USADO",
         "LIQUIDO IRPF APOS USO",
+        "LIQUIDO FERIAS/PGTO ANTES DAS FERIAS",
     ]
 
     self.criar_componentes()
@@ -77,7 +78,7 @@ class AppFluxoCaixa:
     # Título
     titulo = tk.Label(
         self.root,
-        text="Fluxo de Caixa Contínuo",
+        text="Fluxo de Caixa Contínuo - Abatimento por Lote de Crédito",
         font=("Arial", 15, "bold"),
         bg="#f0f0f0",
         fg="#333",
@@ -87,7 +88,7 @@ class AppFluxoCaixa:
     # Painel de Resumo do Saldo em tempo real
     self.frame_resumo = tk.LabelFrame(
         self.root,
-        text=" Resumo do Caixa (Saldo Atual Após Abatimento) ",
+        text=" Resumo Geral e Sobras por Crédito ",
         font=("Arial", 9, "bold"),
         bg="#e8f4f8",
     )
@@ -136,7 +137,7 @@ class AppFluxoCaixa:
 
     # Tabela de Histórico (Treeview)
     frame_tabela = tk.LabelFrame(
-        self.root, text=" Histórico de Lançamentos ", font=("Arial", 9, "bold")
+        self.root, text=" Histórico e Linhas de Sobra no Caixa ", font=("Arial", 9, "bold")
     )
     frame_tabela.pack(fill="both", expand=True, padx=10, pady=4)
 
@@ -150,25 +151,30 @@ class AppFluxoCaixa:
         "Observação",
     )
     self.tabela = ttk.Treeview(
-        frame_tabela, columns=colunas, show="headings", selectmode="browse", height=7
+        frame_tabela, columns=colunas, show="headings", selectmode="browse", height=6
     )
+
+    # Configuração de cores para linhas especiais (Sobra no Caixa)
+    self.tabela.tag_configure("sobra_linha", background="#d1ecf1", foreground="#0c5460")
+    self.tabela.tag_configure("credito_linha", background="#e2f0d9")
+    self.tabela.tag_configure("debito_linha", background="#fce4d6")
 
     for col in colunas:
       self.tabela.heading(col, text=col)
       if col == "ID":
         self.tabela.column(col, width=35, anchor="center")
       elif col == "Data":
-        self.tabela.column(col, width=75, anchor="center")
+        self.tabela.column(col, width=80, anchor="center")
       elif col == "Fluxo":
-        self.tabela.column(col, width=65, anchor="center")
+        self.tabela.column(col, width=70, anchor="center")
       elif col == "Tipo / Operação":
-        self.tabela.column(col, width=160, anchor="w")
+        self.tabela.column(col, width=180, anchor="w")
       elif col == "Despesa / Detalhe":
-        self.tabela.column(col, width=140, anchor="w")
+        self.tabela.column(col, width=160, anchor="w")
       elif col == "Valor (R$)":
-        self.tabela.column(col, width=85, anchor="e")
+        self.tabela.column(col, width=100, anchor="e")
       else:
-        self.tabela.column(col, width=130, anchor="w")
+        self.tabela.column(col, width=200, anchor="w")
 
     scrollbar = ttk.Scrollbar(
         frame_tabela, orient="vertical", command=self.tabela.yview
@@ -421,31 +427,14 @@ class AppFluxoCaixa:
 
     id_lancamento = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    self.tabela.insert(
-        "",
-        "end",
-        values=(
-            id_lancamento,
-            data,
-            tipo_fluxo,
-            tipo_operacao,
-            despesa,
-            f"R$ {valor:,.2f}"
-            .replace(",", "X")
-            .replace(".", ",")
-            .replace("X", "."),
-            obs,
-        ),
-    )
-
     self.salvar_no_csv_novo(
         id_lancamento, data, tipo_fluxo, tipo_operacao, despesa, valor, obs
     )
-    self.atualizar_resumo_caixa()
+    self.recalcular_e_atualizar_tabela()
     self.limpar_campos()
 
     if tipo_fluxo == "DÉBITO":
-      total_c, total_d, saldo = self.calcular_totais()
+      total_c, total_d, saldo = self.calcular_totais_gerais()
       saldo_fmt = (
           f"R$ {saldo:,.2f}"
           .replace(",", "X")
@@ -454,7 +443,7 @@ class AppFluxoCaixa:
       )
       messagebox.showinfo(
           "Débito Lançado",
-          f"Débito registrado com sucesso!\n\nNovo Saldo Restante no Caixa:"
+          f"Débito registrado e abatido!\n\nNovo Saldo Restante no Caixa:"
           f" {saldo_fmt}",
       )
     else:
@@ -475,110 +464,146 @@ class AppFluxoCaixa:
       escritor.writerow([id_l, data, fluxo, tipo, despesa, valor, obs])
 
   def carregar_dados(self):
-    if os.path.exists(ARQUIVO_DADOS):
-      with open(ARQUIVO_DADOS, mode="r", newline="", encoding="utf-8") as arquivo:
-        leitor = csv.reader(arquivo)
-        next(leitor, None)
-        for linha in leitor:
-          if len(linha) == 7:
-            id_l, data, fluxo, tipo, despesa, valor, obs = linha
-            try:
-              val_float = float(valor)
-              valor_formatado = (
-                  f"R$ {val_float:,.2f}"
-                  .replace(",", "X")
-                  .replace(".", ",")
-                  .replace("X", ".")
-              )
-            except:
-              valor_formatado = valor
-            self.tabela.insert(
-                "",
-                "end",
-                values=(
-                    id_l,
-                    data,
-                    fluxo,
-                    tipo,
-                    despesa,
-                    valor_formatado,
-                    obs,
-                ),
-            )
-          elif len(linha) == 6:
-            id_l, data, tipo, despesa, valor, obs = linha
-            fluxo = "CRÉDITO"
-            try:
-              val_float = float(valor)
-              valor_formatado = (
-                  f"R$ {val_float:,.2f}"
-                  .replace(",", "X")
-                  .replace(".", ",")
-                  .replace("X", ".")
-              )
-            except:
-              valor_formatado = valor
-            self.tabela.insert(
-                "",
-                "end",
-                values=(
-                    id_l,
-                    data,
-                    fluxo,
-                    tipo,
-                    despesa,
-                    valor_formatado,
-                    obs,
-                ),
-            )
-    self.atualizar_resumo_caixa()
+    self.recalcular_e_atualizar_tabela()
 
-  def calcular_totais(self):
+  def recalcular_e_atualizar_tabela(self):
+    for item in self.tabela.get_children():
+      self.tabela.delete(item)
+
+    if not os.path.exists(ARQUIVO_DADOS):
+      self.atualizar_resumo_caixa(0, 0, 0)
+      return
+
+    registros = []
+    with open(ARQUIVO_DADOS, mode="r", newline="", encoding="utf-8") as arquivo:
+      leitor = csv.reader(arquivo)
+      next(leitor, None)
+      for linha in leitor:
+        if len(linha) == 7:
+          id_l, data, fluxo, tipo, despesa, valor, obs = linha
+        elif len(linha) == 6:
+          id_l, data, tipo, despesa, valor, obs = linha
+          fluxo = "CRÉDITO"
+        else:
+          continue
+        try:
+          val_float = float(valor)
+        except:
+          val_float = 0.0
+        registros.append({
+            "id": id_l,
+            "data": data,
+            "fluxo": fluxo,
+            "tipo": tipo,
+            "despesa": despesa,
+            "valor": val_float,
+            "obs": obs,
+        })
+
+    creditos_ativos = []
+    total_creditos_geral = 0.0
+    total_debitos_geral = 0.0
+
+    for reg in registros:
+      val_fmt = f"R$ {reg['valor']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+      if reg["fluxo"] == "CRÉDITO":
+        total_creditos_geral += reg["valor"]
+        creditos_ativos.append({"id": reg["id"], "disponivel": reg["valor"]})
+        
+        # Insere a linha do Crédito
+        self.tabela.insert(
+            "",
+            "end",
+            values=(
+                reg["id"],
+                reg["data"],
+                reg["fluxo"],
+                reg["tipo"],
+                reg["despesa"],
+                val_fmt,
+                reg["obs"],
+            ),
+            tag="credito_linha",
+        )
+      else:
+        total_debitos_geral += reg["valor"]
+        debito_restante = reg["valor"]
+
+        while debito_restante > 0 and creditos_ativos:
+          lote = creditos_ativos[0]
+          if lote["disponivel"] >= debito_restante:
+            lote["disponivel"] -= debito_restante
+            debito_restante = 0.0
+          else:
+            debito_restante -= lote["disponivel"]
+            lote["disponivel"] = 0.0
+            creditos_ativos.pop(0)
+
+        # Insere a linha do Débito
+        self.tabela.insert(
+            "",
+            "end",
+            values=(
+                reg["id"],
+                reg["data"],
+                reg["fluxo"],
+                reg["tipo"],
+                reg["despesa"],
+                val_fmt,
+                reg["obs"],
+            ),
+            tag="debito_linha",
+        )
+
+        # Calcula a sobra exata no caixa após este débito
+        soma_sobras = sum(l["disponivel"] for l in creditos_ativos)
+        sobra_fmt = f"R$ {soma_sobras:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        # Insere a linha logo abaixo mostrando a Sobra no Caixa
+        id_sobra = f"{reg['id']}_sobra"
+        self.tabela.insert(
+            "",
+            "end",
+            values=(
+                "",
+                reg["data"],
+                "SOBRA",
+                "-> SOBRA NO CAIXA APÓS ABATIMENTO",
+                "",
+                sobra_fmt,
+                f"Referente ao débito: {reg['tipo']}",
+            ),
+            tag="sobra_linha",
+        )
+
+    saldo_final = total_creditos_geral - total_debitos_geral
+    self.atualizar_resumo_caixa(total_creditos_geral, total_debitos_geral, saldo_final)
+
+  def calcular_totais_gerais(self):
     total_creditos = 0.0
     total_debitos = 0.0
-    for child in self.tabela.get_children():
-      vals = self.tabela.item(child)["values"]
-      fluxo = vals[2]
-      val_str = vals[5]
-      try:
-        val_limpo = (
-            val_str.replace("R$", "")
-            .replace(".", "")
-            .replace(",", ".")
-            .strip()
-        )
-        val_float = float(val_limpo)
-      except:
-        val_float = 0.0
+    if not os.path.exists(ARQUIVO_DADOS):
+      return 0.0, 0.0, 0.0
+    with open(ARQUIVO_DADOS, mode="r", newline="", encoding="utf-8") as arquivo:
+      leitor = csv.reader(arquivo)
+      next(leitor, None)
+      for linha in leitor:
+        if len(linha) >= 6:
+          try:
+            fluxo = linha[2] if len(linha) == 7 else "CRÉDITO"
+            val = float(linha[5] if len(linha) == 7 else linha[4])
+            if fluxo == "CRÉDITO":
+              total_creditos += val
+            else:
+              total_debitos += val
+          except:
+            pass
+    return total_creditos, total_debitos, total_creditos - total_debitos
 
-      if fluxo == "CRÉDITO":
-        total_creditos += val_float
-      else:
-        total_debitos += val_float
-
-    saldo_restante = total_creditos - total_debitos
-    return total_creditos, total_debitos, saldo_restante
-
-  def atualizar_resumo_caixa(self):
-    t_cred, t_deb, saldo = self.calcular_totais()
-    c_fmt = (
-        f"R$ {t_cred:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
-    )
-    d_fmt = (
-        f"R$ {t_deb:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
-    )
-    s_fmt = (
-        f"R$ {saldo:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
-    )
+  def atualizar_resumo_caixa(self, t_cred, t_deb, saldo):
+    c_fmt = f"R$ {t_cred:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    d_fmt = f"R$ {t_deb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    s_fmt = f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     self.lbl_resumo_creditos.config(text=f"Total Entradas: {c_fmt}")
     self.lbl_resumo_debitos.config(text=f"Total Saídas: {d_fmt}")
@@ -596,6 +621,10 @@ class AppFluxoCaixa:
 
     item = self.tabela.item(selecionado)
     valores = item["values"]
+
+    # Se clicar na linha de sobra, ignora pois ela é informativa
+    if valores[2] == "SOBRA":
+      return
 
     self.id_em_edicao = str(valores[0])
     data = valores[1]
@@ -665,25 +694,6 @@ class AppFluxoCaixa:
       messagebox.showerror("Erro", "Valor inválido.")
       return
 
-    valor_fmt = (
-        f"R$ {novo_valor:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
-    )
-    self.tabela.item(
-        selecionado,
-        values=(
-            self.id_em_edicao,
-            nova_data,
-            fluxo_atual,
-            tipo_atual,
-            nova_despesa,
-            valor_fmt,
-            nova_obs,
-        ),
-    )
-
     linhas = []
     if os.path.exists(ARQUIVO_DADOS):
       with open(ARQUIVO_DADOS, mode="r", newline="", encoding="utf-8") as arquivo:
@@ -712,7 +722,7 @@ class AppFluxoCaixa:
           )
         escritor.writerows(linhas)
 
-    self.atualizar_resumo_caixa()
+    self.recalcular_e_atualizar_tabela()
     messagebox.showinfo("Sucesso", "Lançamento editado com sucesso!")
     self.limpar_campos()
 
@@ -725,9 +735,12 @@ class AppFluxoCaixa:
       return
 
     item = self.tabela.item(selecionado)
-    id_alvo = item["values"][0]
+    valores = item["values"]
+    if valores[2] == "SOBRA":
+      messagebox.showwarning("Aviso", "Esta é uma linha informativa de sobra. Selecione um Crédito ou Débito real para excluir.")
+      return
 
-    self.tabela.delete(selecionado)
+    id_alvo = valores[0]
 
     linhas_mantidas = []
     if os.path.exists(ARQUIVO_DADOS):
@@ -746,7 +759,7 @@ class AppFluxoCaixa:
           )
         escritor.writerows(linhas_mantidas)
 
-    self.atualizar_resumo_caixa()
+    self.recalcular_e_atualizar_tabela()
     self.limpar_campos()
     messagebox.showinfo("Sucesso", "Lançamento excluído com sucesso!")
 
@@ -808,7 +821,7 @@ class AppFluxoCaixa:
       if filtro_fluxo:
         titulo_texto = f"Relatório - Fluxo de Caixa ({filtro_fluxo})"
       else:
-        titulo_texto = "Relatório - Fluxo de Caixa Contínuo"
+        titulo_texto = "Relatório - Fluxo de Caixa Contínuo (Com Linhas de Sobra)"
 
       titulo_estilo = ParagraphStyle(
           "TituloEstilo",
@@ -834,25 +847,10 @@ class AppFluxoCaixa:
       )
       elementos.append(Spacer(1, 10))
 
-      t_cred, t_deb, saldo = self.calcular_totais()
-      c_fmt = (
-          f"R$ {t_cred:,.2f}"
-          .replace(",", "X")
-          .replace(".", ",")
-          .replace("X", ".")
-      )
-      d_fmt = (
-          f"R$ {t_deb:,.2f}"
-          .replace(",", "X")
-          .replace(".", ",")
-          .replace("X", ".")
-      )
-      s_fmt = (
-          f"R$ {saldo:,.2f}"
-          .replace(",", "X")
-          .replace(".", ",")
-          .replace("X", ".")
-      )
+      t_cred, t_deb, saldo = self.calcular_totais_gerais()
+      c_fmt = f"R$ {t_cred:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+      d_fmt = f"R$ {t_deb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+      s_fmt = f"R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
       resumo_texto = f"<b>Total de Entradas:</b> {c_fmt} | <b>Total de Saídas:</b> {d_fmt} | <b>Saldo Restante:</b> {s_fmt}"
       elementos.append(Paragraph(resumo_texto, styles["Normal"]))
@@ -867,68 +865,99 @@ class AppFluxoCaixa:
           "Observação",
       ]]
 
+      registros = []
       with open(ARQUIVO_DADOS, mode="r", newline="", encoding="utf-8") as arquivo:
         leitor = csv.reader(arquivo)
         next(leitor, None)
         for linha in leitor:
           if len(linha) == 7:
             _, data, fluxo, tipo, despesa, valor, obs = linha
-            if filtro_fluxo and fluxo != filtro_fluxo:
-              continue
-            try:
-              val_float = float(valor)
-              valor_fmt = (
-                  f"R$ {val_float:,.2f}"
-                  .replace(",", "X")
-                  .replace(".", ",")
-                  .replace("X", ".")
-              )
-            except:
-              valor_fmt = valor
-            dados_tabela.append([data, fluxo, tipo, despesa, valor_fmt, obs])
           elif len(linha) == 6:
             _, data, tipo, despesa, valor, obs = linha
             fluxo = "CRÉDITO"
-            if filtro_fluxo and fluxo != filtro_fluxo:
-              continue
-            try:
-              val_float = float(valor)
-              valor_fmt = (
-                  f"R$ {val_float:,.2f}"
-                  .replace(",", "X")
-                  .replace(".", ",")
-                  .replace("X", ".")
-              )
-            except:
-              valor_fmt = valor
-            dados_tabela.append([data, fluxo, tipo, despesa, valor_fmt, obs])
+          else:
+            continue
+          try:
+            val_float = float(valor)
+          except:
+            val_float = 0.0
+          registros.append({
+              "data": data,
+              "fluxo": fluxo,
+              "tipo": tipo,
+              "despesa": despesa,
+              "valor": val_float,
+              "obs": obs,
+          })
 
-      if len(dados_tabela) == 1:
-        messagebox.showwarning(
-            "Aviso", f"Nenhum registro encontrado para o filtro: {filtro_fluxo}"
-        )
-        return
+      creditos_ativos = []
+      for reg in registros:
+        if filtro_fluxo and reg["fluxo"] != filtro_fluxo:
+          continue
 
-      tabela_pdf = Table(dados_tabela, colWidths=[60, 65, 120, 110, 80, 115])
+        val_fmt = f"R$ {reg['valor']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        if reg["fluxo"] == "CRÉDITO":
+          creditos_ativos.append({"disponivel": reg["valor"]})
+          dados_tabela.append([
+              reg["data"],
+              reg["fluxo"],
+              reg["tipo"],
+              reg["despesa"],
+              val_fmt,
+              reg["obs"],
+          ])
+        else:
+          debito_restante = reg["valor"]
+          while debito_restante > 0 and creditos_ativos:
+            lote = creditos_ativos[0]
+            if lote["disponivel"] >= debito_restante:
+              lote["disponivel"] -= debito_restante
+              debito_restante = 0.0
+            else:
+              debito_restante -= lote["disponivel"]
+              lote["disponivel"] = 0.0
+              creditos_ativos.pop(0)
+
+          dados_tabela.append([
+              reg["data"],
+              reg["fluxo"],
+              reg["tipo"],
+              reg["despesa"],
+              val_fmt,
+              reg["obs"],
+          ])
+
+          # Linha de sobra no PDF
+          soma_sobras = sum(l["disponivel"] for l in creditos_ativos)
+          sobra_fmt = f"R$ {soma_sobras:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+          dados_tabela.append([
+              reg["data"],
+              "SOBRA",
+              "-> SOBRA NO CAIXA",
+              "",
+              sobra_fmt,
+              f"Após débito: {reg['tipo']}",
+          ])
+
+      tabela_pdf = Table(dados_tabela, colWidths=[65, 65, 120, 110, 85, 95])
       tabela_pdf.setStyle(
           TableStyle([
               ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2196F3")),
               ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
               ("ALIGN", (0, 0), (-1, -1), "LEFT"),
               ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-              ("FONTSIZE", (0, 0), (-1, 0), 9),
+              ("FONTSIZE", (0, 0), (-1, 0), 8),
               ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
               ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f9f9f9")),
               ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d3d3d3")),
               ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-              ("FONTSIZE", (0, 1), (-1, -1), 8),
+              ("FONTSIZE", (0, 1), (-1, -1), 7),
           ])
       )
 
       elementos.append(tabela_pdf)
       doc.build(elementos)
 
-      # 1. Abre o arquivo PDF automaticamente para visualização
       caminho_absoluto = os.path.abspath(nome_arquivo_pdf)
       try:
         if sys.platform == "win32":
@@ -938,28 +967,21 @@ class AppFluxoCaixa:
         else:
           subprocess.run(["xdg-open", caminho_absoluto])
       except Exception as ex:
-        print(f"Não foi possível abrir automaticamente: {ex}")
+        print(f"Erro ao abrir PDF: {ex}")
 
-      # 2. Pergunta se deseja enviar por WhatsApp Web após conferir
       resposta = messagebox.askyesno(
-          "Relatório Gerado e Aberto",
-          f"O relatório foi gerado e aberto para conferência!\nSalvo em:"
-          f" {nome_arquivo_pdf}\n\nDeseja abrir o WhatsApp Web para enviar este"
-          " relatório?",
+          "Relatório Gerado",
+          f"Relatório gerado com sucesso!\nSalvo em: {nome_arquivo_pdf}\n\nDeseja abrir o WhatsApp Web para enviar?",
       )
       if resposta:
         texto_msg = urllib.parse.quote(
-            f"Olá! Segue em anexo/resumo o relatório do Fluxo de Caixa"
-            f" ({'Geral' if not filtro_fluxo else filtro_fluxo}). O arquivo PDF"
-            f" salvo no computador é: {nome_arquivo_pdf}"
+            f"Olá! Segue o relatório do Fluxo de Caixa com as linhas de sobra."
         )
         url_whats = f"https://wa.me/?text={texto_msg}"
         webbrowser.open(url_whats)
 
     except Exception as e:
-      messagebox.showerror(
-          "Erro", f"Ocorreu um erro ao gerar o PDF:\n{str(e)}"
-      )
+      messagebox.showerror("Erro", f"Ocorreu um erro ao gerar o PDF:\n{str(e)}")
 
 
 if __name__ == "__main__":
