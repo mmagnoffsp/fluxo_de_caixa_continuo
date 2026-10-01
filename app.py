@@ -1,7 +1,7 @@
 import csv
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime
 
 # Importações do ReportLab para geração de PDF
@@ -17,8 +17,8 @@ class AppFluxoCaixa:
     def __init__(self, root):
         self.root = root
         self.root.title("Controle de Fluxo de Caixa & Balancete")
-        self.root.geometry("1100x720")
-        self.root.minsize(950, 620)
+        self.root.geometry("1100x740")
+        self.root.minsize(950, 640)
 
         # Configuração de Estilo
         self.style = ttk.Style()
@@ -72,18 +72,20 @@ class AppFluxoCaixa:
             "FERIAS TRABALHADAS 10 DIAS",
             "PAGAMENTO APOS AS FERIAS",
             "VALE APOS FERIAS",
-            "DESPESAS DIVERSAS"
+            "DESPESAS DIVERSAS",
+            "OUTRA CONTA (DIGITAR MANUALMENTE)"
         ]
         self.conta_poupanca_combo = ttk.Combobox(form_frame, textvariable=self.conta_poupanca_var, values=opcoes_pagamento, state="readonly", width=35)
         self.conta_poupanca_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
+        self.conta_poupanca_combo.bind("<<ComboboxSelected>>", self.verificar_conta_manual)
 
         # Inicializar categorias
         self.atualizar_categorias()
 
         # Linha 2
         ttk.Label(form_frame, text="Descrição:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        desc_entry = ttk.Entry(form_frame, textvariable=self.descricao_var, width=50)
-        desc_entry.grid(row=2, column=1, columnspan=3, sticky="w", padx=5, pady=5)
+        self.desc_entry = ttk.Entry(form_frame, textvariable=self.descricao_var, width=50)
+        self.desc_entry.grid(row=2, column=1, columnspan=3, sticky="w", padx=5, pady=5)
 
         # Linha 3
         ttk.Label(form_frame, text="Observação:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
@@ -96,6 +98,9 @@ class AppFluxoCaixa:
 
         btn_adicionar = ttk.Button(btn_frame, text="Adicionar Lançamento", command=self.adicionar_registro)
         btn_adicionar.pack(side="left", padx=5)
+
+        btn_editar = ttk.Button(btn_frame, text="Editar Selecionado", command=self.carregar_registro_para_edicao)
+        btn_editar.pack(side="left", padx=5)
 
         btn_excluir = ttk.Button(btn_frame, text="Excluir Selecionado", command=self.excluir_registro)
         btn_excluir.pack(side="left", padx=5)
@@ -125,6 +130,7 @@ class AppFluxoCaixa:
 
         colunas = ("Data", "Tipo", "Categoria", "Valor", "Descrição", "Observação")
         self.tabela = ttk.Treeview(tabela_frame, columns=colunas, show="headings", selectmode="browse")
+        self.tabela.bind("<Double-1>", lambda event: self.carregar_registro_para_edicao())
 
         for col in colunas:
             self.tabela.heading(col, text=col)
@@ -152,36 +158,172 @@ class AppFluxoCaixa:
         self.cat_combo['values'] = cats
         self.categoria_var.set(cats[0])
 
+    def verificar_conta_manual(self, event=None):
+        if self.conta_poupanca_var.get() == "OUTRA CONTA (DIGITAR MANUALMENTE)":
+            conta_manual = simpledialog.askstring("Conta Manual", "Digite o número ou nome da conta resgatada/utilizada:")
+            if conta_manual and conta_manual.strip():
+                self.conta_manual_custom = conta_manual.strip().upper()
+            else:
+                self.conta_manual_custom = "OUTRA CONTA"
+        else:
+            self.conta_manual_custom = None
+
     def adicionar_registro(self):
         tipo = self.tipo_var.get()
         categoria = self.categoria_var.get()
-        valor_str = self.valor_var.get().replace(",", ".")
-        descricao = self.descricao_var.get().strip()
-        obs = self.obs_var.get().strip()
-        conta = self.conta_poupanca_var.get().strip()
-        data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-        if not valor_str or not descricao:
-            messagebox.showerror("Erro", "Preencha os campos de Valor e Descrição!")
+        
+        valor_bruto = self.valor_var.get().strip()
+        if not valor_bruto:
+            messagebox.showerror("Erro", "Preencha o campo de Valor!")
             return
 
-        descricao_final = f"[{conta}] - {descricao}" if conta else descricao
+        descricao = self.descricao_var.get().strip()
+        if not descricao:
+            messagebox.showerror("Erro", "Preencha o campo de Descrição!")
+            return
 
+        if categoria == "Resgate da Poupança":
+            qual_poupanca = simpledialog.askstring("Qual Poupança?", "Informe de qual poupança foi feito o resgate (Ex: Poupança Caixa, Nubank):")
+            if qual_poupanca:
+                descricao = f"Resgate da {qual_poupanca.strip()} - {descricao}"
+
+        conta = self.conta_poupanca_var.get().strip()
+        if conta == "OUTRA CONTA (DIGITAR MANUALMENTE)":
+            if hasattr(self, 'conta_manual_custom') and self.conta_manual_custom:
+                conta = self.conta_manual_custom
+            else:
+                conta_manual = simpledialog.askstring("Conta Manual", "Digite o número ou nome da conta resgatada/utilizada:")
+                conta = conta_manual.strip().upper() if conta_manual and conta_manual.strip() else "OUTRA CONTA"
+
+        valor_str = valor_bruto.replace("R$", "").strip()
+        if "," in valor_str:
+            valor_str = valor_str.replace(".", "").replace(",", ".")
+        
         try:
             valor = float(valor_str)
             if valor <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Erro", "Insira um valor numérico válido maior que zero!")
+            messagebox.showerror("Erro", "Insira um valor numérico válido maior que zero (ex: 7033,70)!")
             return
 
-        self.tabela.insert("", "end", values=(data_atual, tipo, categoria, f"R$ {valor:.2f}", descricao_final, obs))
+        obs = self.obs_var.get().strip()
+        data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+        descricao_final = f"[{conta}] - {descricao}" if conta and not descricao.startswith("[") else descricao
+        valor_formatado = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        self.tabela.insert("", "end", values=(data_atual, tipo, categoria, valor_formatado, descricao_final, obs))
         self.salvar_dados_csv()
 
         self.valor_var.set("")
         self.descricao_var.set("")
         self.obs_var.set("")
+        self.conta_manual_custom = None
         self.atualizar_saldo()
+
+    def carregar_registro_para_edicao(self):
+        selecionado = self.tabela.selection()
+        if not selecionado:
+            messagebox.showwarning("Aviso", "Selecione um registro na tabela para editar (ou clique duas vezes sobre ele).")
+            return
+
+        item_id = selecionado[0]
+        vals = self.tabela.item(item_id, "values")
+        data, tipo, cat, val_str, desc, obs = vals
+
+        # Janela de Edição
+        self.edit_janela = tk.Toplevel(self.root)
+        self.edit_janela.title("Editar Lançamento")
+        self.edit_janela.geometry("500x420")
+        self.edit_janela.grab_set()
+
+        ttk.Label(self.edit_janela, text="Editar Dados do Lançamento", font=("Helvetica", 12, "bold")).pack(pady=10)
+
+        frame_edicao = ttk.Frame(self.edit_janela, padding=15)
+        frame_edicao.pack(fill="both", expand=True)
+
+        # Data
+        ttk.Label(frame_edicao, text="Data (DD/MM/AAAA HH:MM):").grid(row=0, column=0, sticky="w", pady=5)
+        e_data_var = tk.StringVar(value=data)
+        e_data_entry = ttk.Entry(frame_edicao, textvariable=e_data_var, width=27)
+        e_data_entry.grid(row=0, column=1, sticky="w", pady=5)
+
+        # Tipo
+        ttk.Label(frame_edicao, text="Tipo:").grid(row=1, column=0, sticky="w", pady=5)
+        e_tipo_var = tk.StringVar(value=tipo)
+        e_tipo_combo = ttk.Combobox(frame_edicao, textvariable=e_tipo_var, values=["Entrada", "Saída"], state="readonly", width=25)
+        e_tipo_combo.grid(row=1, column=1, sticky="w", pady=5)
+
+        # Categoria
+        ttk.Label(frame_edicao, text="Categoria:").grid(row=2, column=0, sticky="w", pady=5)
+        e_cat_var = tk.StringVar(value=cat)
+        e_cat_combo = ttk.Combobox(frame_edicao, textvariable=e_cat_var, values=self.cat_combo['values'], state="readonly", width=25)
+        e_cat_combo.grid(row=2, column=1, sticky="w", pady=5)
+
+        # Atualizar categorias se o tipo mudar na edição
+        def mudar_cats_edicao(event=None):
+            if e_tipo_var.get() == "Entrada":
+                e_cat_combo['values'] = ["Resgate da Poupança", "Transferência para Poupança", "Conta Corrente", "Outras Despesas", "Outras Receitas"]
+            else:
+                e_cat_combo['values'] = ["Saída", "Débito", "Transferência para Poupança", "Conta Corrente", "Despesa Operacional", "Outras Despesas"]
+        e_tipo_combo.bind("<<ComboboxSelected>>", mudar_cats_edicao)
+
+        # Valor
+        ttk.Label(frame_edicao, text="Valor (R$):").grid(row=3, column=0, sticky="w", pady=5)
+        limpa_val = val_str.replace("R$", "").strip()
+        e_val_var = tk.StringVar(value=limpa_val)
+        e_val_entry = ttk.Entry(frame_edicao, textvariable=e_val_var, width=27)
+        e_val_entry.grid(row=3, column=1, sticky="w", pady=5)
+
+        # Descrição
+        ttk.Label(frame_edicao, text="Descrição:").grid(row=4, column=0, sticky="w", pady=5)
+        e_desc_var = tk.StringVar(value=desc)
+        e_desc_entry = ttk.Entry(frame_edicao, textvariable=e_desc_var, width=38)
+        e_desc_entry.grid(row=4, column=1, sticky="w", pady=5)
+
+        # Observação
+        ttk.Label(frame_edicao, text="Observação:").grid(row=5, column=0, sticky="w", pady=5)
+        e_obs_var = tk.StringVar(value=obs)
+        e_obs_entry = ttk.Entry(frame_edicao, textvariable=e_obs_var, width=38)
+        e_obs_entry.grid(row=5, column=1, sticky="w", pady=5)
+
+        def salvar_edicao():
+            nova_data = e_data_var.get().strip()
+            novo_tipo = e_tipo_var.get()
+            nova_cat = e_cat_var.get()
+            novo_val_bruto = e_val_var.get().strip()
+            nova_desc = e_desc_var.get().strip()
+            nova_obs = e_obs_var.get().strip()
+
+            if not nova_data or not novo_val_bruto or not nova_desc:
+                messagebox.showerror("Erro", "Data, Valor e Descrição não podem ficar vazios!", parent=self.edit_janela)
+                return
+
+            v_str = novo_val_bruto.replace("R$", "").strip()
+            if "," in v_str:
+                v_str = v_str.replace(".", "").replace(",", ".")
+            
+            try:
+                v_num = float(v_str)
+                if v_num <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Erro", "Insira um valor numérico válido!", parent=self.edit_janela)
+                return
+
+            novo_val_formatado = f"R$ {v_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            # Atualiza na tabela com a nova data e dados editados
+            self.tabela.item(item_id, values=(nova_data, novo_tipo, nova_cat, novo_val_formatado, nova_desc, nova_obs))
+            self.salvar_dados_csv()
+            self.atualizar_saldo()
+
+            messagebox.showinfo("Sucesso", "Lançamento atualizado com sucesso!", parent=self.edit_janela)
+            self.edit_janela.destroy()
+
+        btn_salvar_edit = ttk.Button(frame_edicao, text="Salvar Alterações", command=salvar_edicao)
+        btn_salvar_edit.grid(row=6, column=0, columnspan=2, pady=15)
 
     def excluir_registro(self):
         selecionado = self.tabela.selection()
