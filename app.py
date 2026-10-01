@@ -35,7 +35,7 @@ class AppFluxoCaixa:
     self.sub_categorias = [
         "FINANCIAMENTO APTO",
         "CONDOMINIO",
-        "COMPRAS PARCELADAS NO CARTAO",
+        "PARCELADAS NO CARTAO",
         "FACULDADE",
         "DESPESAS MEDICAS",
         "VALE REFEIÇAO",
@@ -49,7 +49,7 @@ class AppFluxoCaixa:
         "RAÇAO DE GATO",
         "AREIA DE GATO",
         "VACINAS NOS GATOS",
-        "DIVERSOS",
+        "DESPESAS DIVERSAS",
     ]
 
     # Lista de botões/operações solicitadas (Disponíveis em Crédito e Débito)
