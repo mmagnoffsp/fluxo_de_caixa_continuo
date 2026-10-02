@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox, simpledialog, filedialog
 from datetime import datetime
 
 # Importações do ReportLab para geração de PDF
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -21,8 +21,8 @@ class AppFluxoCaixa:
     def __init__(self, root):
         self.root = root
         self.root.title("Controle de Fluxo de Caixa & Balancete")
-        self.root.geometry("1100x740")
-        self.root.minsize(950, 640)
+        self.root.geometry("1100x780")
+        self.root.minsize(950, 660)
 
         # Configuração de Estilo
         self.style = ttk.Style()
@@ -32,6 +32,7 @@ class AppFluxoCaixa:
         self.tipo_var = tk.StringVar(value="Entrada")
         self.categoria_var = tk.StringVar(value="Geral")
         self.valor_var = tk.StringVar()
+        self.data_var = tk.StringVar(value=datetime.now().strftime("%d/%m/%Y %H:%M"))
         self.descricao_var = tk.StringVar()
         self.obs_var = tk.StringVar()
         self.conta_poupanca_var = tk.StringVar(value="PAGAMENTO")
@@ -86,19 +87,25 @@ class AppFluxoCaixa:
         # Inicializar categorias
         self.atualizar_categorias()
 
-        # Linha 2
-        ttk.Label(form_frame, text="Descrição:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.desc_entry = ttk.Entry(form_frame, textvariable=self.descricao_var, width=50)
-        self.desc_entry.grid(row=2, column=1, columnspan=3, sticky="w", padx=5, pady=5)
+        # Linha 2 - Data e Hora
+        ttk.Label(form_frame, text="Data e Hora:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        data_entry = ttk.Entry(form_frame, textvariable=self.data_var, width=20)
+        data_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        tk.Label(form_frame, text="(Formato: DD/MM/AAAA HH:MM)", font=("Helvetica", 8), fg="#7f8c8d").grid(row=2, column=2, sticky="w", padx=5, pady=5)
 
-        # Linha 3
-        ttk.Label(form_frame, text="Observação:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        # Linha 3 - Descrição
+        ttk.Label(form_frame, text="Descrição:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.desc_entry = ttk.Entry(form_frame, textvariable=self.descricao_var, width=50)
+        self.desc_entry.grid(row=3, column=1, columnspan=3, sticky="w", padx=5, pady=5)
+
+        # Linha 4 - Observação
+        ttk.Label(form_frame, text="Observação:").grid(row=4, column=0, sticky="w", padx=5, pady=5)
         obs_entry = ttk.Entry(form_frame, textvariable=self.obs_var, width=50)
-        obs_entry.grid(row=3, column=1, columnspan=3, sticky="w", padx=5, pady=5)
+        obs_entry.grid(row=4, column=1, columnspan=3, sticky="w", padx=5, pady=5)
 
         # Botões de Ação
         btn_frame = ttk.Frame(form_frame)
-        btn_frame.grid(row=4, column=0, columnspan=4, pady=10)
+        btn_frame.grid(row=5, column=0, columnspan=4, pady=10)
 
         btn_adicionar = ttk.Button(btn_frame, text="Adicionar Lançamento", command=self.adicionar_registro)
         btn_adicionar.pack(side="left", padx=5)
@@ -143,7 +150,7 @@ class AppFluxoCaixa:
             elif col in ["Tipo", "Categoria"]:
                 self.tabela.column(col, width=155, anchor="center")
             elif col == "Data":
-                self.tabela.column(col, width=120, anchor="center")
+                self.tabela.column(col, width=130, anchor="center")
             else:
                 self.tabela.column(col, width=170, anchor="w")
 
@@ -176,6 +183,10 @@ class AppFluxoCaixa:
         tipo = self.tipo_var.get()
         categoria = self.categoria_var.get()
         
+        data_lancamento = self.data_var.get().strip()
+        if not data_lancamento:
+            data_lancamento = datetime.now().strftime("%d/%m/%Y %H:%M")
+
         valor_bruto = self.valor_var.get().strip()
         if not valor_bruto:
             messagebox.showerror("Erro", "Preencha o campo de Valor!")
@@ -212,17 +223,17 @@ class AppFluxoCaixa:
             return
 
         obs = self.obs_var.get().strip()
-        data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
         descricao_final = f"[{conta}] - {descricao}" if conta and not descricao.startswith("[") else descricao
         valor_formatado = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-        self.tabela.insert("", "end", values=(data_atual, tipo, categoria, valor_formatado, descricao_final, obs))
+        self.tabela.insert("", "end", values=(data_lancamento, tipo, categoria, valor_formatado, descricao_final, obs))
         self.salvar_dados_csv()
 
         self.valor_var.set("")
         self.descricao_var.set("")
         self.obs_var.set("")
+        self.data_var.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
         self.conta_manual_custom = None
         self.atualizar_saldo()
 
@@ -238,7 +249,7 @@ class AppFluxoCaixa:
 
         self.edit_janela = tk.Toplevel(self.root)
         self.edit_janela.title("Editar Lançamento")
-        self.edit_janela.geometry("500x420")
+        self.edit_janela.geometry("500x440")
         self.edit_janela.grab_set()
 
         ttk.Label(self.edit_janela, text="Editar Dados do Lançamento", font=("Helvetica", 12, "bold")).pack(pady=10)
@@ -246,7 +257,7 @@ class AppFluxoCaixa:
         frame_edicao = ttk.Frame(self.edit_janela, padding=15)
         frame_edicao.pack(fill="both", expand=True)
 
-        ttk.Label(frame_edicao, text="Data (DD/MM/AAAA HH:MM):").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(frame_edicao, text="Data e Hora (DD/MM/AAAA HH:MM):").grid(row=0, column=0, sticky="w", pady=5)
         e_data_var = tk.StringVar(value=data)
         e_data_entry = ttk.Entry(frame_edicao, textvariable=e_data_var, width=27)
         e_data_entry.grid(row=0, column=1, sticky="w", pady=5)
@@ -394,7 +405,7 @@ class AppFluxoCaixa:
             elif col in ["Tipo / Evento"]:
                 tree_bal.column(col, width=130, anchor="center")
             elif col == "Data":
-                tree_bal.column(col, width=110, anchor="center")
+                tree_bal.column(col, width=120, anchor="center")
             else:
                 tree_bal.column(col, width=220, anchor="w")
 
@@ -492,7 +503,7 @@ class AppFluxoCaixa:
             if col in ["Valor (R$)", "Saldo Parcial"]:
                 tree_extrato.column(col, width=105, anchor="e")
             elif col in ["Tipo", "Data"]:
-                tree_extrato.column(col, width=95, anchor="center")
+                tree_extrato.column(col, width=110, anchor="center")
             elif col == "Categoria":
                 tree_extrato.column(col, width=130, anchor="center")
             else:
@@ -574,7 +585,6 @@ class AppFluxoCaixa:
             messagebox.showwarning("Aviso", "Não há dados suficientes para gerar o relatório PDF.")
             return
 
-        # Janela de diálogo para escolher onde salvar e o nome do arquivo
         arquivo_caminho = filedialog.asksaveasfilename(
             defaultextension=".pdf",
             filetypes=[("Arquivos PDF", "*.pdf"), ("Todos os arquivos", "*.*")],
@@ -586,8 +596,6 @@ class AppFluxoCaixa:
             return
 
         try:
-            # Margens otimizadas e orientação paisagem (landscape) para caber perfeitamente
-            from reportlab.lib.pagesizes import letter, landscape
             doc = SimpleDocTemplate(arquivo_caminho, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
             elementos = []
             estilos = getSampleStyleSheet()
@@ -595,21 +603,17 @@ class AppFluxoCaixa:
             titulo_estilo = ParagraphStyle('TituloRelatorio', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
             elementos.append(Paragraph("Relatório de Fluxo de Caixa", titulo_estilo))
 
-            # Estilos para o conteúdo das células da tabela do PDF (evita sobreposição)
             estilo_celula = ParagraphStyle('CelulaTabela', parent=estilos['Normal'], fontSize=8, leading=10, fontName='Helvetica')
             estilo_cabecalho = ParagraphStyle('CabecalhoTabela', parent=estilos['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=colors.whitesmoke, alignment=1)
 
-            # Cabeçalhos formatados como Paragraph
             dados = [[Paragraph(h, estilo_cabecalho) for h in ["Data", "Tipo", "Categoria", "Valor", "Descrição", "Observação"]]]
 
-            # Insere as linhas convertendo cada campo de texto em Paragraph
             for linha in self.tabela.get_children():
                 vals = self.tabela.item(linha, "values")
                 linha_paragrafos = [Paragraph(str(v), estilo_celula) for v in vals]
                 dados.append(linha_paragrafos)
 
-            # Larguras ajustadas para página paisagem (total ~730pt úteis)
-            tabela_pdf = Table(dados, colWidths=[100, 80, 130, 95, 175, 150])
+            tabela_pdf = Table(dados, colWidths=[110, 80, 130, 95, 165, 150])
             tabela_pdf.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2c3e50')),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -627,7 +631,6 @@ class AppFluxoCaixa:
 
             messagebox.showinfo("Sucesso", f"Relatório PDF gerado com sucesso!\nSalvo em:\n{arquivo_caminho}")
 
-            # Abrir o PDF gerado automaticamente na tela
             try:
                 if sys.platform == "win32":
                     os.startfile(arquivo_caminho)
