@@ -1,7 +1,7 @@
 import csv
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox, simpledialog, filedialog
 from datetime import datetime
 
 # Importações do ReportLab para geração de PDF
@@ -9,6 +9,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+# Importações para abrir o PDF automaticamente após salvar
+import subprocess
+import sys
 
 # Nome do arquivo CSV para persistência dos dados
 ARQUIVO_CSV = "fluxo_de_caixa_continuo.csv"
@@ -232,7 +236,6 @@ class AppFluxoCaixa:
         vals = self.tabela.item(item_id, "values")
         data, tipo, cat, val_str, desc, obs = vals
 
-        # Janela de Edição
         self.edit_janela = tk.Toplevel(self.root)
         self.edit_janela.title("Editar Lançamento")
         self.edit_janela.geometry("500x420")
@@ -243,25 +246,21 @@ class AppFluxoCaixa:
         frame_edicao = ttk.Frame(self.edit_janela, padding=15)
         frame_edicao.pack(fill="both", expand=True)
 
-        # Data
         ttk.Label(frame_edicao, text="Data (DD/MM/AAAA HH:MM):").grid(row=0, column=0, sticky="w", pady=5)
         e_data_var = tk.StringVar(value=data)
         e_data_entry = ttk.Entry(frame_edicao, textvariable=e_data_var, width=27)
         e_data_entry.grid(row=0, column=1, sticky="w", pady=5)
 
-        # Tipo
         ttk.Label(frame_edicao, text="Tipo:").grid(row=1, column=0, sticky="w", pady=5)
         e_tipo_var = tk.StringVar(value=tipo)
         e_tipo_combo = ttk.Combobox(frame_edicao, textvariable=e_tipo_var, values=["Entrada", "Saída"], state="readonly", width=25)
         e_tipo_combo.grid(row=1, column=1, sticky="w", pady=5)
 
-        # Categoria
         ttk.Label(frame_edicao, text="Categoria:").grid(row=2, column=0, sticky="w", pady=5)
         e_cat_var = tk.StringVar(value=cat)
         e_cat_combo = ttk.Combobox(frame_edicao, textvariable=e_cat_var, values=self.cat_combo['values'], state="readonly", width=25)
         e_cat_combo.grid(row=2, column=1, sticky="w", pady=5)
 
-        # Atualizar categorias se o tipo mudar na edição
         def mudar_cats_edicao(event=None):
             if e_tipo_var.get() == "Entrada":
                 e_cat_combo['values'] = ["Resgate da Poupança", "Transferência para Poupança", "Conta Corrente", "Outras Despesas", "Outras Receitas"]
@@ -269,20 +268,17 @@ class AppFluxoCaixa:
                 e_cat_combo['values'] = ["Saída", "Débito", "Transferência para Poupança", "Conta Corrente", "Despesa Operacional", "Outras Despesas"]
         e_tipo_combo.bind("<<ComboboxSelected>>", mudar_cats_edicao)
 
-        # Valor
         ttk.Label(frame_edicao, text="Valor (R$):").grid(row=3, column=0, sticky="w", pady=5)
         limpa_val = val_str.replace("R$", "").strip()
         e_val_var = tk.StringVar(value=limpa_val)
         e_val_entry = ttk.Entry(frame_edicao, textvariable=e_val_var, width=27)
         e_val_entry.grid(row=3, column=1, sticky="w", pady=5)
 
-        # Descrição
         ttk.Label(frame_edicao, text="Descrição:").grid(row=4, column=0, sticky="w", pady=5)
         e_desc_var = tk.StringVar(value=desc)
         e_desc_entry = ttk.Entry(frame_edicao, textvariable=e_desc_var, width=38)
         e_desc_entry.grid(row=4, column=1, sticky="w", pady=5)
 
-        # Observação
         ttk.Label(frame_edicao, text="Observação:").grid(row=5, column=0, sticky="w", pady=5)
         e_obs_var = tk.StringVar(value=obs)
         e_obs_entry = ttk.Entry(frame_edicao, textvariable=e_obs_var, width=38)
@@ -314,7 +310,6 @@ class AppFluxoCaixa:
 
             novo_val_formatado = f"R$ {v_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            # Atualiza na tabela com a nova data e dados editados
             self.tabela.item(item_id, values=(nova_data, novo_tipo, nova_cat, novo_val_formatado, nova_desc, nova_obs))
             self.salvar_dados_csv()
             self.atualizar_saldo()
@@ -575,41 +570,74 @@ class AppFluxoCaixa:
                 messagebox.showerror("Erro", f"Erro ao carregar dados salvos:\n{str(e)}")
 
     def gerar_pdf(self):
-        arquivo_pdf = "relatorio_fluxo_caixa.pdf"
+        if not self.tabela.get_children():
+            messagebox.showwarning("Aviso", "Não há dados suficientes para gerar o relatório PDF.")
+            return
+
+        # Janela de diálogo para escolher onde salvar e o nome do arquivo
+        arquivo_caminho = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("Arquivos PDF", "*.pdf"), ("Todos os arquivos", "*.*")],
+            initialfile="relatorio_fluxo_caixa.pdf",
+            title="Salvar Relatório PDF"
+        )
+        
+        if not arquivo_caminho:
+            return
+
         try:
-            doc = SimpleDocTemplate(arquivo_pdf, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            # Margens otimizadas e orientação paisagem (landscape) para caber perfeitamente
+            from reportlab.lib.pagesizes import letter, landscape
+            doc = SimpleDocTemplate(arquivo_caminho, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
             elementos = []
             estilos = getSampleStyleSheet()
 
             titulo_estilo = ParagraphStyle('TituloRelatorio', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
             elementos.append(Paragraph("Relatório de Fluxo de Caixa", titulo_estilo))
 
-            dados = [["Data", "Tipo", "Categoria", "Valor", "Descrição", "Observação"]]
+            # Estilos para o conteúdo das células da tabela do PDF (evita sobreposição)
+            estilo_celula = ParagraphStyle('CelulaTabela', parent=estilos['Normal'], fontSize=8, leading=10, fontName='Helvetica')
+            estilo_cabecalho = ParagraphStyle('CabecalhoTabela', parent=estilos['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=colors.whitesmoke, alignment=1)
+
+            # Cabeçalhos formatados como Paragraph
+            dados = [[Paragraph(h, estilo_cabecalho) for h in ["Data", "Tipo", "Categoria", "Valor", "Descrição", "Observação"]]]
+
+            # Insere as linhas convertendo cada campo de texto em Paragraph
             for linha in self.tabela.get_children():
-                dados.append(list(self.tabela.item(linha, "values")))
+                vals = self.tabela.item(linha, "values")
+                linha_paragrafos = [Paragraph(str(v), estilo_celula) for v in vals]
+                dados.append(linha_paragrafos)
 
-            if len(dados) == 1:
-                messagebox.showwarning("Aviso", "Não há dados suficientes para gerar o relatório PDF.")
-                return
-
-            tabela_pdf = Table(dados, colWidths=[80, 65, 110, 85, 140, 100])
+            # Larguras ajustadas para página paisagem (total ~730pt úteis)
+            tabela_pdf = Table(dados, colWidths=[100, 80, 130, 95, 175, 150])
             tabela_pdf.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2c3e50')),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,0), 9),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                 ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('TOPPADDING', (0,0), (-1,0), 8),
                 ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f9f9f9')),
                 ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#d3d3d3')),
-                ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-                ('FONTSIZE', (0,1), (-1,-1), 8),
+                ('BOTTOMPADDING', (0,1), (-1,-1), 6),
+                ('TOPPADDING', (0,1), (-1,-1), 6),
             ]))
 
             elementos.append(tabela_pdf)
             doc.build(elementos)
 
-            messagebox.showinfo("Sucesso", f"Relatório PDF gerado com sucesso!\nSalvo como: {arquivo_pdf}")
+            messagebox.showinfo("Sucesso", f"Relatório PDF gerado com sucesso!\nSalvo em:\n{arquivo_caminho}")
+
+            # Abrir o PDF gerado automaticamente na tela
+            try:
+                if sys.platform == "win32":
+                    os.startfile(arquivo_caminho)
+                elif sys.platform == "darwin":
+                    subprocess.call(["open", arquivo_caminho])
+                else:
+                    subprocess.call(["xdg-open", arquivo_caminho])
+            except Exception as e:
+                print(f"Não foi possível abrir o arquivo automaticamente: {e}")
+
         except Exception as e:
             messagebox.showerror("Erro", f"Ocorreu um erro ao gerar o PDF:\n{str(e)}")
 
