@@ -20,9 +20,9 @@ ARQUIVO_CSV = "fluxo_de_caixa_continuo.csv"
 class AppFluxoCaixa:
     def __init__(self, root):
         self.root = root
-        self.root.title("Controle de Fluxo de Caixa & Balancete")
-        self.root.geometry("1100x780")
-        self.root.minsize(950, 660)
+        self.root.title("Controle de Fluxo de Caixa & Balancete por Conta")
+        self.root.geometry("1150x820")
+        self.root.minsize(1000, 700)
 
         # Configuração de Estilo
         self.style = ttk.Style()
@@ -37,18 +37,20 @@ class AppFluxoCaixa:
         self.obs_var = tk.StringVar()
         self.conta_poupanca_var = tk.StringVar(value="PAGAMENTO")
 
-        # Criar interface
+        # Criar interface (A tabela self.tabela é criada aqui dentro)
         self.criar_widgets()
+        
+        # Carregar os dados salvos e só depois atualizar os botões
         self.carregar_dados()
 
     def criar_widgets(self):
         # Título Principal
-        titulo_label = tk.Label(self.root, text="Controle de Fluxo de Caixa & Balancete por Crédito", font=("Helvetica", 18, "bold"), fg="#2c3e50")
+        titulo_label = tk.Label(self.root, text="Controle de Fluxo de Caixa & Contas Individuais", font=("Helvetica", 18, "bold"), fg="#2c3e50")
         titulo_label.pack(pady=10)
 
         # Frame de Formulário
         form_frame = ttk.LabelFrame(self.root, text=" Novo Lançamento ", padding=15)
-        form_frame.pack(fill="x", padx=20, pady=10)
+        form_frame.pack(fill="x", padx=20, pady=5)
 
         # Grid do Formulário - Linha 0
         ttk.Label(form_frame, text="Tipo:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
@@ -84,7 +86,6 @@ class AppFluxoCaixa:
         self.conta_poupanca_combo.grid(row=1, column=3, sticky="w", padx=5, pady=5)
         self.conta_poupanca_combo.bind("<<ComboboxSelected>>", self.verificar_conta_manual)
 
-        # Inicializar categorias
         self.atualizar_categorias()
 
         # Linha 2 - Data e Hora
@@ -103,62 +104,60 @@ class AppFluxoCaixa:
         obs_entry = ttk.Entry(form_frame, textvariable=self.obs_var, width=50)
         obs_entry.grid(row=4, column=1, columnspan=3, sticky="w", padx=5, pady=5)
 
-        # Botões de Ação
+        # Botões de Ação Principais
         btn_frame = ttk.Frame(form_frame)
         btn_frame.grid(row=5, column=0, columnspan=4, pady=10)
 
-        btn_adicionar = ttk.Button(btn_frame, text="Adicionar Lançamento", command=self.adicionar_registro)
-        btn_adicionar.pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Adicionar Lançamento", command=self.adicionar_registro).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Editar Selecionado", command=self.carregar_registro_para_edicao).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Excluir Selecionado", command=self.excluir_registro).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Excluir Todos", command=self.excluir_todos_registros).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Balancete Crédito", command=self.gerar_balancete_creditos).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Extrato Geral", command=self.gerar_extrato_conta_corrente).pack(side="left", padx=3)
+        ttk.Button(btn_frame, text="Relatório PDF", command=self.gerar_pdf).pack(side="left", padx=3)
 
-        btn_editar = ttk.Button(btn_frame, text="Editar Selecionado", command=self.carregar_registro_para_edicao)
-        btn_editar.pack(side="left", padx=5)
-
-        btn_excluir = ttk.Button(btn_frame, text="Excluir Selecionado", command=self.excluir_registro)
-        btn_excluir.pack(side="left", padx=5)
-
-        btn_excluir_todos = ttk.Button(btn_frame, text="Excluir Todos", command=self.excluir_todos_registros)
-        btn_excluir_todos.pack(side="left", padx=5)
-
-        btn_balancete = ttk.Button(btn_frame, text="Balancete por Crédito", command=self.gerar_balancete_creditos)
-        btn_balancete.pack(side="left", padx=5)
-
-        btn_extrato = ttk.Button(btn_frame, text="Extrato Conta", command=self.gerar_extrato_conta_corrente)
-        btn_extrato.pack(side="left", padx=5)
-
-        btn_pdf = ttk.Button(btn_frame, text="Relatório PDF", command=self.gerar_pdf)
-        btn_pdf.pack(side="left", padx=5)
-
-        # Frame de Resumo / Saldo
-        resumo_frame = ttk.LabelFrame(self.root, text=" Resumo Financeiro ", padding=10)
-        resumo_frame.pack(fill="x", padx=20, pady=5)
-
-        self.lbl_saldo = tk.Label(resumo_frame, text="Saldo Atual: R$ 0,00", font=("Helvetica", 12, "bold"), fg="#27ae60")
-        self.lbl_saldo.pack(anchor="w", padx=10)
-
-        # Tabela (Treeview) para exibir os dados
+        # Tabela (Treeview) para exibir todos os dados (CRIADA ANTES DO PAINEL DE BOTÕES DE CONTAS)
         tabela_frame = ttk.Frame(self.root)
-        tabela_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        tabela_frame.pack(fill="both", expand=True, padx=20, pady=5)
 
         colunas = ("Data", "Tipo", "Categoria", "Valor", "Descrição", "Observação")
         self.tabela = ttk.Treeview(tabela_frame, columns=colunas, show="headings", selectmode="browse")
         self.tabela.bind("<Double-1>", lambda event: self.carregar_registro_para_edicao())
+
+        # Configuração das cores para as tags na tabela
+        self.tabela.tag_configure("credito", foreground="#1b6ca8")  # Azul para Crédito/Entrada
+        self.tabela.tag_configure("debito", foreground="#c0392b")   # Vermelho para Débito/Saída
 
         for col in colunas:
             self.tabela.heading(col, text=col)
             if col == "Valor":
                 self.tabela.column(col, width=100, anchor="e")
             elif col in ["Tipo", "Categoria"]:
-                self.tabela.column(col, width=155, anchor="center")
+                self.tabela.column(col, width=145, anchor="center")
             elif col == "Data":
                 self.tabela.column(col, width=130, anchor="center")
             else:
-                self.tabela.column(col, width=170, anchor="w")
+                self.tabela.column(col, width=180, anchor="w")
 
         scrollbar = ttk.Scrollbar(tabela_frame, orient="vertical", command=self.tabela.yview)
         self.tabela.configure(yscrollcommand=scrollbar.set)
 
         self.tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+        # Painel Dinâmico de Botões Individuais por Conta / Poupança
+        self.contas_frame = ttk.LabelFrame(self.root, text=" Extratos Individuais por Conta / Poupança (Gerados Automaticamente) ", padding=10)
+        self.contas_frame.pack(fill="x", padx=20, pady=5)
+        
+        self.inner_botoes_frame = ttk.Frame(self.contas_frame)
+        self.inner_botoes_frame.pack(fill="x")
+
+        # Frame de Resumo / Saldo Geral
+        resumo_frame = ttk.LabelFrame(self.root, text=" Resumo Financeiro Geral ", padding=8)
+        resumo_frame.pack(fill="x", padx=20, pady=5)
+
+        self.lbl_saldo = tk.Label(resumo_frame, text="Saldo Geral Atual: R$ 0,00", font=("Helvetica", 11, "bold"), fg="#27ae60")
+        self.lbl_saldo.pack(anchor="w", padx=10)
 
     def atualizar_categorias(self, event=None):
         tipo = self.tipo_var.get()
@@ -174,10 +173,126 @@ class AppFluxoCaixa:
             conta_manual = simpledialog.askstring("Conta Manual", "Digite o número ou nome da conta resgatada/utilizada:")
             if conta_manual and conta_manual.strip():
                 self.conta_manual_custom = conta_manual.strip().upper()
+                if self.conta_manual_custom not in self.conta_poupanca_combo['values']:
+                    lista_atual = list(self.conta_poupanca_combo['values'])
+                    lista_atual.insert(0, self.conta_manual_custom)
+                    self.conta_poupanca_combo['values'] = lista_atual
+                self.conta_poupanca_var.set(self.conta_manual_custom)
             else:
                 self.conta_manual_custom = "OUTRA CONTA"
         else:
             self.conta_manual_custom = None
+
+    def extrair_nome_conta(self, descricao):
+        """Extrai o identificador da conta que está entre colchetes no início da descrição ex: [PAGAMENTO]"""
+        if descricao.startswith("[") and "]" in descricao:
+            fim = descricao.find("]")
+            return descricao[1:fim].strip()
+        return "GERAL / OUTROS"
+
+    def obter_contas_existentes(self):
+        """Varre todos os lançamentos para coletar quais contas/poupanças foram mencionadas"""
+        contas = set()
+        for linha in self.tabela.get_children():
+            vals = self.tabela.item(linha, "values")
+            desc = vals[4]
+            conta = self.extrair_nome_conta(desc)
+            if conta:
+                contas.add(conta)
+        return sorted(list(contas))
+
+    def atualizar_botoes_contas(self):
+        """Limpa e recria os botões dinâmicos de cada conta no painel superior"""
+        for widget in self.inner_botoes_frame.winfo_children():
+            widget.destroy()
+
+        contas = self.obter_contas_existentes()
+        if not contas:
+            lbl_vazio = tk.Label(self.inner_botoes_frame, text="Nenhuma conta identificada ainda nos lançamentos.", font=("Helvetica", 9, "italic"), fg="#7f8c8d")
+            lbl_vazio.pack(anchor="w", padx=5)
+            return
+
+        for conta in contas:
+            btn = ttk.Button(self.inner_botoes_frame, text=f"Conta: {conta}", command=lambda c=conta: self.gerar_extrato_especifico(c))
+            btn.pack(side="left", padx=4, pady=2)
+
+    def gerar_extrato_especifico(self, nome_conta):
+        """Abre uma janela com o extrato individual (entradas, saídas e saldo) de uma conta específica"""
+        itens = self.tabela.get_children()
+        
+        ext_janela = tk.Toplevel(self.root)
+        ext_janela.title(f"Extrato Detalhado - {nome_conta}")
+        ext_janela.geometry("980x560")
+
+        header_frame = ttk.Frame(ext_janela, padding=10)
+        header_frame.pack(fill="x")
+
+        tk.Label(header_frame, text=f"EXTRATO DA CONTA / POUPANÇA: {nome_conta}", font=("Helvetica", 13, "bold"), fg="#1b6ca8").pack(anchor="w")
+        tk.Label(header_frame, text=f"Histórico exclusivo de entradas e saídas registradas para esta conta.", font=("Helvetica", 9), fg="#7f8c8d").pack(anchor="w")
+
+        tabela_frame_esp = ttk.Frame(ext_janela)
+        tabela_frame_esp.pack(fill="both", expand=True, padx=10, pady=5)
+
+        cols = ("Data", "Categoria", "Tipo", "Valor", "Descrição Completa", "Observação")
+        tree_esp = ttk.Treeview(tabela_frame_esp, columns=cols, show="headings", selectmode="none")
+
+        for col in cols:
+            tree_esp.heading(col, text=col)
+            if col == "Valor":
+                tree_esp.column(col, width=105, anchor="e")
+            elif col in ["Tipo", "Data"]:
+                tree_esp.column(col, width=110, anchor="center")
+            elif col == "Categoria":
+                tree_esp.column(col, width=135, anchor="center")
+            else:
+                tree_esp.column(col, width=210, anchor="w")
+
+        scroll_esp = ttk.Scrollbar(tabela_frame_esp, orient="vertical", command=tree_esp.yview)
+        tree_esp.configure(yscrollcommand=scroll_esp.set)
+
+        tree_esp.pack(side="left", fill="both", expand=True)
+        scroll_esp.pack(side="right", fill="y")
+
+        total_entradas_conta = 0.0
+        total_saidas_conta = 0.0
+        qtd_movimentos = 0
+
+        for linha in itens:
+            vals = self.tabela.item(linha, "values")
+            data, tipo, cat, val_str, desc, obs = vals
+            
+            conta_linha = self.extrair_nome_conta(desc)
+            if conta_linha == nome_conta:
+                limpo = val_str.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+                try:
+                    v_num = float(limpo)
+                except ValueError:
+                    v_num = 0.0
+
+                if tipo == "Entrada":
+                    total_entradas_conta += v_num
+                    sinal_val = f"+ R$ {v_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                else:
+                    total_saidas_conta += v_num
+                    sinal_val = f"- R$ {v_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+                tree_esp.insert("", "end", values=(data, cat, tipo, sinal_val, desc, obs))
+                qtd_movimentos += 1
+
+        footer_frame = ttk.Frame(ext_janela, padding=10)
+        footer_frame.pack(fill="x")
+
+        saldo_conta = total_entradas_conta - total_saidas_conta
+        t_ent = f"Total Entradas na Conta: R$ {total_entradas_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        t_sai = f"Total Saídas da Conta: R$ {total_saidas_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        t_sld = f"Saldo Líquido Atual desta Conta: R$ {saldo_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        tk.Label(footer_frame, text=t_ent, fg="#27ae60", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        tk.Label(footer_frame, text=t_sai, fg="#c0392b", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        tk.Label(footer_frame, text=t_sld, fg="#2c3e50" if saldo_conta >= 0 else "#c0392b", font=("Helvetica", 11, "bold")).pack(anchor="w")
+
+        if qtd_movimentos == 0:
+            messagebox.showinfo("Informação", f"Nenhum lançamento encontrado especificamente para a conta '{nome_conta}'.", parent=ext_janela)
 
     def adicionar_registro(self):
         tipo = self.tipo_var.get()
@@ -227,7 +342,9 @@ class AppFluxoCaixa:
         descricao_final = f"[{conta}] - {descricao}" if conta and not descricao.startswith("[") else descricao
         valor_formatado = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-        self.tabela.insert("", "end", values=(data_lancamento, tipo, categoria, valor_formatado, descricao_final, obs))
+        tag_cor = "credito" if tipo == "Entrada" else "debito"
+
+        self.tabela.insert("", "end", values=(data_lancamento, tipo, categoria, valor_formatado, descricao_final, obs), tags=(tag_cor,))
         self.salvar_dados_csv()
 
         self.valor_var.set("")
@@ -235,7 +352,9 @@ class AppFluxoCaixa:
         self.obs_var.set("")
         self.data_var.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
         self.conta_manual_custom = None
+        
         self.atualizar_saldo()
+        self.atualizar_botoes_contas()
 
     def carregar_registro_para_edicao(self):
         selecionado = self.tabela.selection()
@@ -259,8 +378,7 @@ class AppFluxoCaixa:
 
         ttk.Label(frame_edicao, text="Data e Hora (DD/MM/AAAA HH:MM):").grid(row=0, column=0, sticky="w", pady=5)
         e_data_var = tk.StringVar(value=data)
-        e_data_entry = ttk.Entry(frame_edicao, textvariable=e_data_var, width=27)
-        e_data_entry.grid(row=0, column=1, sticky="w", pady=5)
+        ttk.Entry(frame_edicao, textvariable=e_data_var, width=27).grid(row=0, column=1, sticky="w", pady=5)
 
         ttk.Label(frame_edicao, text="Tipo:").grid(row=1, column=0, sticky="w", pady=5)
         e_tipo_var = tk.StringVar(value=tipo)
@@ -282,18 +400,15 @@ class AppFluxoCaixa:
         ttk.Label(frame_edicao, text="Valor (R$):").grid(row=3, column=0, sticky="w", pady=5)
         limpa_val = val_str.replace("R$", "").strip()
         e_val_var = tk.StringVar(value=limpa_val)
-        e_val_entry = ttk.Entry(frame_edicao, textvariable=e_val_var, width=27)
-        e_val_entry.grid(row=3, column=1, sticky="w", pady=5)
+        ttk.Entry(frame_edicao, textvariable=e_val_var, width=27).grid(row=3, column=1, sticky="w", pady=5)
 
         ttk.Label(frame_edicao, text="Descrição:").grid(row=4, column=0, sticky="w", pady=5)
         e_desc_var = tk.StringVar(value=desc)
-        e_desc_entry = ttk.Entry(frame_edicao, textvariable=e_desc_var, width=38)
-        e_desc_entry.grid(row=4, column=1, sticky="w", pady=5)
+        ttk.Entry(frame_edicao, textvariable=e_desc_var, width=38).grid(row=4, column=1, sticky="w", pady=5)
 
         ttk.Label(frame_edicao, text="Observação:").grid(row=5, column=0, sticky="w", pady=5)
         e_obs_var = tk.StringVar(value=obs)
-        e_obs_entry = ttk.Entry(frame_edicao, textvariable=e_obs_var, width=38)
-        e_obs_entry.grid(row=5, column=1, sticky="w", pady=5)
+        ttk.Entry(frame_edicao, textvariable=e_obs_var, width=38).grid(row=5, column=1, sticky="w", pady=5)
 
         def salvar_edicao():
             nova_data = e_data_var.get().strip()
@@ -320,16 +435,17 @@ class AppFluxoCaixa:
                 return
 
             novo_val_formatado = f"R$ {v_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            tag_cor = "credito" if novo_tipo == "Entrada" else "debito"
 
-            self.tabela.item(item_id, values=(nova_data, novo_tipo, nova_cat, novo_val_formatado, nova_desc, nova_obs))
+            self.tabela.item(item_id, values=(nova_data, novo_tipo, nova_cat, novo_val_formatado, nova_desc, nova_obs), tags=(tag_cor,))
             self.salvar_dados_csv()
             self.atualizar_saldo()
+            self.atualizar_botoes_contas()
 
             messagebox.showinfo("Sucesso", "Lançamento atualizado com sucesso!", parent=self.edit_janela)
             self.edit_janela.destroy()
 
-        btn_salvar_edit = ttk.Button(frame_edicao, text="Salvar Alterações", command=salvar_edicao)
-        btn_salvar_edit.grid(row=6, column=0, columnspan=2, pady=15)
+        ttk.Button(frame_edicao, text="Salvar Alterações", command=salvar_edicao).grid(row=6, column=0, columnspan=2, pady=15)
 
     def excluir_registro(self):
         selecionado = self.tabela.selection()
@@ -341,6 +457,7 @@ class AppFluxoCaixa:
             self.tabela.delete(selecionado)
             self.salvar_dados_csv()
             self.atualizar_saldo()
+            self.atualizar_botoes_contas()
 
     def excluir_todos_registros(self):
         itens = self.tabela.get_children()
@@ -353,6 +470,7 @@ class AppFluxoCaixa:
                 self.tabela.delete(item)
             self.salvar_dados_csv()
             self.atualizar_saldo()
+            self.atualizar_botoes_contas()
             messagebox.showinfo("Sucesso", "Todos os lançamentos foram apagados.")
 
     def atualizar_saldo(self):
@@ -370,7 +488,7 @@ class AppFluxoCaixa:
             except ValueError:
                 pass
 
-        self.lbl_saldo.config(text=f"Saldo Atual: R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        self.lbl_saldo.config(text=f"Saldo Geral Atual: R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         if saldo >= 0:
             self.lbl_saldo.config(fg="#27ae60")
         else:
@@ -390,17 +508,16 @@ class AppFluxoCaixa:
         header_frame.pack(fill="x")
 
         tk.Label(header_frame, text="BALANCETE ANALÍTICO: CRÉDITOS VS DESPESAS", font=("Helvetica", 14, "bold"), fg="#2c3e50").pack(anchor="w")
-        tk.Label(header_frame, text="Demonstração do consumo de despesas por crédito e saldo real restante para uso.", font=("Helvetica", 9), fg="#7f8c8d").pack(anchor="w")
 
         tabela_frame_bal = ttk.Frame(bal_janela)
         tabela_frame_bal.pack(fill="both", expand=True, padx=10, pady=5)
 
-        cols = ("Data", "Tipo / Evento", "Descrição / Histórico", "Valor Original", "Valor Abatido / Gasto", "Saldo Restante do Crédito")
+        cols = ("Data", "Tipo / Evento", "Descrição / Histórico", "Valor Original", "Valor Abatido / Gasto", "Saldo Restante")
         tree_bal = ttk.Treeview(tabela_frame_bal, columns=cols, show="headings", selectmode="none")
 
         for col in cols:
             tree_bal.heading(col, text=col)
-            if col in ["Valor Original", "Valor Abatido / Gasto", "Saldo Restante do Crédito"]:
+            if col in ["Valor Original", "Valor Abatido / Gasto", "Saldo Restante"]:
                 tree_bal.column(col, width=125, anchor="e")
             elif col in ["Tipo / Evento"]:
                 tree_bal.column(col, width=130, anchor="center")
@@ -472,9 +589,7 @@ class AppFluxoCaixa:
 
         saldo_real_livre = sum(c['saldo'] for c in creditos_ativos) - despesas_nao_alocadas
         t_sld_real = f"REAL SALDO DO QUE SOBROU PARA USO: R$ {saldo_real_livre:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-        lbl_real = tk.Label(footer_frame, text=t_sld_real, fg="#27ae60" if saldo_real_livre >= 0 else "#c0392b", font=("Helvetica", 11, "bold"))
-        lbl_real.pack(anchor="w")
+        tk.Label(footer_frame, text=t_sld_real, fg="#27ae60" if saldo_real_livre >= 0 else "#c0392b", font=("Helvetica", 11, "bold")).pack(anchor="w")
 
     def gerar_extrato_conta_corrente(self):
         itens = self.tabela.get_children()
@@ -483,14 +598,13 @@ class AppFluxoCaixa:
             return
 
         extrato_janela = tk.Toplevel(self.root)
-        extrato_janela.title("Extrato de Movimentações - Conta Corrente")
+        extrato_janela.title("Extrato Geral de Movimentações")
         extrato_janela.geometry("1000x600")
 
         header_frame = ttk.Frame(extrato_janela, padding=10)
         header_frame.pack(fill="x")
 
-        tk.Label(header_frame, text="EXTRATO BANCÁRIO DE CONTA CORRENTE", font=("Helvetica", 14, "bold"), fg="#2c3e50").pack(anchor="w")
-        tk.Label(header_frame, text=f"Emitido em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", font=("Helvetica", 9), fg="#7f8c8d").pack(anchor="w")
+        tk.Label(header_frame, text="EXTRATO GERAL CONSOLIDADO", font=("Helvetica", 14, "bold"), fg="#2c3e50").pack(anchor="w")
 
         tabela_frame_ext = ttk.Frame(extrato_janela)
         tabela_frame_ext.pack(fill="both", expand=True, padx=10, pady=5)
@@ -548,7 +662,7 @@ class AppFluxoCaixa:
 
         t_ent = f"Total Entradas: R$ {total_entradas:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         t_sai = f"Total Saídas: R$ {total_saidas:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        t_sld = f"Saldo Final em Conta: R$ {saldo_acumulado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        t_sld = f"Saldo Final Consolidado: R$ {saldo_acumulado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         tk.Label(footer_frame, text=t_ent, fg="#27ae60", font=("Helvetica", 10, "bold")).pack(anchor="w")
         tk.Label(footer_frame, text=t_sai, fg="#c0392b", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -575,8 +689,12 @@ class AppFluxoCaixa:
                             if len(linha) == 5:
                                 d, t, v, desc, obs = linha
                                 linha = [d, t, "Geral", v, desc, obs]
-                            self.tabela.insert("", "end", values=linha)
+                            
+                            tipo = linha[1]
+                            tag_cor = "credito" if tipo == "Entrada" else "debito"
+                            self.tabela.insert("", "end", values=linha, tags=(tag_cor,))
                 self.atualizar_saldo()
+                self.atualizar_botoes_contas()
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao carregar dados salvos:\n{str(e)}")
 
@@ -601,7 +719,7 @@ class AppFluxoCaixa:
             estilos = getSampleStyleSheet()
 
             titulo_estilo = ParagraphStyle('TituloRelatorio', parent=estilos['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
-            elementos.append(Paragraph("Relatório de Fluxo de Caixa", titulo_estilo))
+            elementos.append(Paragraph("Relatório de Fluxo de Caixa por Contas", titulo_estilo))
 
             estilo_celula = ParagraphStyle('CelulaTabela', parent=estilos['Normal'], fontSize=8, leading=10, fontName='Helvetica')
             estilo_cabecalho = ParagraphStyle('CabecalhoTabela', parent=estilos['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=colors.whitesmoke, alignment=1)
