@@ -170,6 +170,7 @@ class AppFluxoCaixa:
     def atualizar_categorias(self, event=None):
         # === CATEGORIAS DE ENTRADA ===
         cats_entrada = [
+            "Disponível em Conta Corrente",
             "Salário",
             "13º Salário - 1ª Parcela",
             "13º Salário - 2ª Parcela",
@@ -189,6 +190,7 @@ class AppFluxoCaixa:
         
         # === CATEGORIAS DE SAÍDA ===
         cats_saida = [
+            "Disponível em Conta Corrente",
             "Pagamento",
             "Adiantamento",
             "Vale",
