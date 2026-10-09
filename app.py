@@ -24,7 +24,6 @@ class AppFluxoCaixa:
         self.style = ttk.Style()
         self.style.theme_use("clam")
 
-        # Variáveis
         self.tipo_var = tk.StringVar(value="Entrada")
         self.categoria_var = tk.StringVar()
         self.valor_var = tk.StringVar()
@@ -32,12 +31,11 @@ class AppFluxoCaixa:
         self.descricao_var = tk.StringVar()
         self.obs_var = tk.StringVar()
 
-        # Variáveis dos FILTROS ESTILO EXCEL
         self.filtro_data_inicio = tk.StringVar()
         self.filtro_data_fim = tk.StringVar()
         self.filtro_tipo = tk.StringVar(value="Todos")
         self.filtro_categoria = tk.StringVar(value="Todas")
-        self._todos_dados = []  # Guarda todos os registros para filtrar
+        self._todos_dados = []
 
         self.criar_pasta_backup()
         self.criar_widgets()
@@ -57,7 +55,6 @@ class AppFluxoCaixa:
         return False
 
     def criar_widgets(self):
-        # === CABEÇALHO ===
         header_frame = tk.Frame(self.root, bg="#2c3e50", padx=15, pady=12)
         header_frame.pack(fill="x")
         tk.Label(header_frame, text="💰 CONTROLE DE FLUXO DE CAIXA", 
@@ -65,7 +62,6 @@ class AppFluxoCaixa:
         tk.Label(header_frame, text="Filtros por Data, Período, Tipo e Categoria", 
                  font=("Helvetica", 10), fg="#bdc3c7", bg="#2c3e50").pack()
 
-        # === ÁREA DE LANÇAMENTO ===
         form_frame = ttk.LabelFrame(self.root, text="📝 Novo Lançamento")
         form_frame.pack(fill="x", padx=15, pady=5)
 
@@ -76,7 +72,7 @@ class AppFluxoCaixa:
         self.tipo_combo.bind("<<ComboboxSelected>>", self.atualizar_categorias)
 
         ttk.Label(form_frame, text="Categoria:").grid(row=0, column=2, sticky="w", padx=8, pady=6)
-        self.cat_combo = ttk.Combobox(form_frame, textvariable=self.categoria_var, state="readonly", width=25)
+        self.cat_combo = ttk.Combobox(form_frame, textvariable=self.categoria_var, state="readonly", width=35)
         self.cat_combo.grid(row=0, column=3, padx=8, pady=6)
 
         ttk.Label(form_frame, text="Valor R$:").grid(row=0, column=4, sticky="w", padx=8, pady=6)
@@ -97,11 +93,9 @@ class AppFluxoCaixa:
         ttk.Button(btn_form, text="✏️ Editar", command=self.editar_registro).pack(side="left", padx=4)
         ttk.Button(btn_form, text="🗑️ Excluir", command=self.excluir_registro).pack(side="left", padx=4)
 
-        # === FILTROS ESTILO EXCEL ===
         filtro_frame = ttk.LabelFrame(self.root, text="🔍 FILTROS — Selecione para filtrar e gerar relatório")
         filtro_frame.pack(fill="x", padx=15, pady=5)
 
-        # Filtro de PERÍODO / DATA
         ttk.Label(filtro_frame, text="📅 Data Início:").grid(row=0, column=0, sticky="w", padx=8, pady=6)
         ttk.Entry(filtro_frame, textvariable=self.filtro_data_inicio, width=15).grid(row=0, column=1, padx=5, pady=6)
         ttk.Label(filtro_frame, text="(dd/mm/aaaa)").grid(row=0, column=2, sticky="w", padx=0, pady=6)
@@ -110,21 +104,18 @@ class AppFluxoCaixa:
         ttk.Entry(filtro_frame, textvariable=self.filtro_data_fim, width=15).grid(row=0, column=4, padx=5, pady=6)
         ttk.Label(filtro_frame, text="(deixe vazio = todos)").grid(row=0, column=5, sticky="w", padx=0, pady=6)
 
-        # Filtro TIPO
         ttk.Label(filtro_frame, text="Tipo:").grid(row=1, column=0, sticky="w", padx=8, pady=6)
         filt_tipo = ttk.Combobox(filtro_frame, textvariable=self.filtro_tipo,
                                  values=["Todos", "Entrada", "Saída"], state="readonly", width=15)
         filt_tipo.grid(row=1, column=1, padx=5, pady=6)
         filt_tipo.bind("<<ComboboxSelected>>", self.aplicar_filtros)
 
-        # Filtro CATEGORIA
         ttk.Label(filtro_frame, text="Categoria:").grid(row=1, column=3, sticky="w", padx=15, pady=6)
         self.filt_categoria = ttk.Combobox(filtro_frame, textvariable=self.filtro_categoria,
-                                            state="readonly", width=22)
+                                            state="readonly", width=35)
         self.filt_categoria.grid(row=1, column=4, padx=5, pady=6)
         self.filt_categoria.bind("<<ComboboxSelected>>", self.aplicar_filtros)
 
-        # Botões dos filtros
         btn_filtro = ttk.Frame(filtro_frame)
         btn_filtro.grid(row=0, column=6, rowspan=2, padx=15, pady=6)
         ttk.Button(btn_filtro, text="🔍 Aplicar Filtro", command=self.aplicar_filtros).pack(fill="x", pady=3)
@@ -132,7 +123,6 @@ class AppFluxoCaixa:
         ttk.Button(btn_filtro, text="📄 Extrato Filtrado", command=self.gerar_extrato_filtrado).pack(fill="x", pady=3)
         ttk.Button(btn_filtro, text="📋 PDF Filtrado", command=self.gerar_pdf_filtrado).pack(fill="x", pady=3)
 
-        # === TABELA ===
         tabela_frame = ttk.Frame(self.root)
         tabela_frame.pack(fill="both", expand=True, padx=15, pady=5)
 
@@ -147,7 +137,7 @@ class AppFluxoCaixa:
             if col == "Valor":
                 self.tabela.column(col, width=130, anchor="e")
             elif col in ["Tipo", "Categoria"]:
-                self.tabela.column(col, width=150, anchor="center")
+                self.tabela.column(col, width=250, anchor="center")
             elif col == "Data":
                 self.tabela.column(col, width=160, anchor="center")
             else:
@@ -158,7 +148,6 @@ class AppFluxoCaixa:
         self.tabela.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
 
-        # === RESUMO / SALDO ===
         resumo_frame = tk.Frame(self.root, bg="#ecf0f1", padx=15, pady=12)
         resumo_frame.pack(fill="x")
 
@@ -179,23 +168,63 @@ class AppFluxoCaixa:
         self.lbl_status_filtro.pack(anchor="w")
 
     def atualizar_categorias(self, event=None):
-        if self.tipo_var.get() == "Entrada":
-            cats = ["Salário", "Rendimento", "Resgate", "Reembolso", "Venda", "Outras Receitas"]
-        else:
-            cats = ["Moradia", "Alimentação", "Transporte", "Saúde", "Educação",
-                    "Lazer", "Cartão", "Empréstimo", "Contas", "Outras Despesas"]
-        self.cat_combo['values'] = cats
-        if not self.categoria_var.get():
-            self.categoria_var.set(cats[0])
+        # === CATEGORIAS DE ENTRADA ===
+        cats_entrada = [
+            "Salário",
+            "13º Salário - 1ª Parcela",
+            "13º Salário - 2ª Parcela",
+            "Férias",
+            "Pagamento antes das Férias",
+            "Pagamento após as Férias",
+            "Adiantamento",
+            "Vale",
+            "Vale após as Férias",
+            "Resgate Poupança",
+            "Rendimento",
+            "Resgate",
+            "Reembolso",
+            "Venda",
+            "Outras Receitas"
+        ]
         
-        # Atualizar filtro de categorias com TODAS as opções
-        todas_cats = ["Todas", "Salário", "Rendimento", "Resgate", "Reembolso", "Venda", "Outras Receitas",
-                      "Moradia", "Alimentação", "Transporte", "Saúde", "Educação", "Lazer",
-                      "Cartão", "Empréstimo", "Contas", "Outras Despesas"]
+        # === CATEGORIAS DE SAÍDA ===
+        cats_saida = [
+            "Pagamento",
+            "Adiantamento",
+            "Vale",
+            "Vale após as Férias",
+            "13º Salário - 1ª Parcela",
+            "13º Salário - 2ª Parcela",
+            "Férias",
+            "Pagamento antes das Férias",
+            "Pagamento após as Férias",
+            "Transferência Poupança",
+            "Moradia",
+            "Alimentação",
+            "Transporte",
+            "Saúde",
+            "Educação",
+            "Lazer",
+            "Cartão",
+            "Empréstimo",
+            "Contas",
+            "Outras Despesas"
+        ]
+
+        if self.tipo_var.get() == "Entrada":
+            cats = cats_entrada
+        else:
+            cats = cats_saida
+
+        self.cat_combo['values'] = cats
+        if not self.categoria_var.get() or self.categoria_var.get() not in cats:
+            self.categoria_var.set(cats[0])
+
+        # Atualizar filtro com TODAS as categorias
+        todas_cats = ["Todas"] + sorted(set(cats_entrada + cats_saida))
         self.filt_categoria['values'] = todas_cats
 
     def _parse_data(self, texto_data):
-        """Converte data do formato dd/mm/aaaa hh:mm para objeto datetime"""
         try:
             if " " in texto_data:
                 return datetime.strptime(texto_data, "%d/%m/%Y %H:%M")
@@ -205,57 +234,42 @@ class AppFluxoCaixa:
             return None
 
     def aplicar_filtros(self, event=None):
-        """Aplica todos os filtros e atualiza a tabela"""
-        # Limpar tabela
         for linha in self.tabela.get_children():
             self.tabela.delete(linha)
 
-        # Pegar valores dos filtros
         data_inicio_txt = self.filtro_data_inicio.get().strip()
         data_fim_txt = self.filtro_data_fim.get().strip()
         tipo_filtro = self.filtro_tipo.get()
         cat_filtro = self.filtro_categoria.get()
 
-        # Converter datas
         data_inicio = self._parse_data(data_inicio_txt) if data_inicio_txt else None
         data_fim = self._parse_data(data_fim_txt) if data_fim_txt else None
-        if data_fim and len(data_fim_txt) <= 10:  # Só data, sem hora → inclui todo o dia
+        if data_fim and len(data_fim_txt) <= 10:
             data_fim = data_fim.replace(hour=23, minute=59, second=59)
 
-        # Filtrar e reinserir
         qtd_mostrada = 0
         for vals, tags in self._todos_dados:
             data_reg = self._parse_data(vals[0])
             if not data_reg:
                 continue
-
-            # Filtro de data
             if data_inicio and data_reg < data_inicio:
                 continue
             if data_fim and data_reg > data_fim:
                 continue
-
-            # Filtro de tipo
             if tipo_filtro != "Todos" and vals[1] != tipo_filtro:
                 continue
-
-            # Filtro de categoria
             if cat_filtro != "Todas" and vals[2] != cat_filtro:
                 continue
-
             self.tabela.insert("", "end", values=vals, tags=tags)
             qtd_mostrada += 1
 
-        # Atualizar status
         status = f"✅ Exibindo {qtd_mostrada} registro(s)"
         if data_inicio_txt or data_fim_txt or tipo_filtro != "Todos" or cat_filtro != "Todas":
             status += " — FILTRADO"
         self.lbl_status_filtro.config(text=status)
-
         self.atualizar_saldo_exibicao()
 
     def limpar_filtros(self):
-        """Remove todos os filtros e mostra tudo"""
         self.filtro_data_inicio.set("")
         self.filtro_data_fim.set("")
         self.filtro_tipo.set("Todos")
@@ -263,7 +277,6 @@ class AppFluxoCaixa:
         self.aplicar_filtros()
 
     def calcular_totais_tabela(self):
-        """Calcula totais da tabela que está VISÍVEL no momento"""
         entradas = 0.0
         saidas = 0.0
         for linha in self.tabela.get_children():
@@ -282,20 +295,15 @@ class AppFluxoCaixa:
 
     def atualizar_saldo_exibicao(self, mensagem_extra=""):
         entradas, saidas, saldo = self.calcular_totais_tabela()
-
         self.lbl_entradas.config(
             text=f"📈 Total de Entradas: R$ {entradas:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         )
         self.lbl_saidas.config(
             text=f"📉 Total de Saídas: R$ {saidas:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         )
-
         saldo_fmt = f"💰 SALDO ATUAL: R$ {saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         self.lbl_saldo.config(text=saldo_fmt)
-        if saldo >= 0:
-            self.lbl_saldo.config(fg="#27ae60")
-        else:
-            self.lbl_saldo.config(fg="#e74c3c")
+        self.lbl_saldo.config(fg="#27ae60" if saldo >= 0 else "#e74c3c")
 
     def adicionar_registro(self):
         tipo = self.tipo_var.get()
@@ -325,9 +333,8 @@ class AppFluxoCaixa:
         self.fazer_backup()
         self._todos_dados.append((vals, (tag,)))
         self.salvar_dados_csv()
-        self.aplicar_filtros()  # Reaplica filtro e atualiza
+        self.aplicar_filtros()
 
-        # Limpar
         self.valor_var.set("")
         self.descricao_var.set("")
         self.obs_var.set("")
@@ -339,15 +346,11 @@ class AppFluxoCaixa:
             messagebox.showinfo("Dica", "Selecione um lançamento na tabela")
             return
 
-        item_id = selecionado[0]
-        idx_visivel = self.tabela.index(item_id)
-        
-        # Encontrar no banco completo
-        vals_atuais = self.tabela.item(item_id, "values")
-        
+        vals_atuais = self.tabela.item(selecionado[0], "values")
+
         janela = tk.Toplevel(self.root)
         janela.title("✏️ Editar Lançamento")
-        janela.geometry("520x450")
+        janela.geometry("520x480")
         janela.grab_set()
 
         e_data = tk.StringVar(value=vals_atuais[0])
@@ -361,20 +364,24 @@ class AppFluxoCaixa:
         frame = ttk.Frame(janela, padding=15)
         frame.pack(fill="both", expand=True)
 
-        campos = [
-            ("Data/Hora:", e_data),
-            ("Tipo:", e_tipo),
-            ("Categoria:", e_cat),
-            ("Valor:", e_val),
-            ("Descrição:", e_desc),
-            ("Observação:", e_obs),
-        ]
-        for i, (rot, var) in enumerate(campos):
-            ttk.Label(frame, text=rot).grid(row=i, column=0, sticky="w", pady=6)
-            if rot == "Tipo:":
-                ttk.Combobox(frame, textvariable=var, values=["Entrada", "Saída"], state="readonly", width=35).grid(row=i, column=1, pady=6)
-            else:
-                ttk.Entry(frame, textvariable=var, width=35).grid(row=i, column=1, pady=6)
+        ttk.Label(frame, text="Data/Hora:").grid(row=0, column=0, sticky="w", pady=6)
+        ttk.Entry(frame, textvariable=e_data, width=40).grid(row=0, column=1, pady=6)
+
+        ttk.Label(frame, text="Tipo:").grid(row=1, column=0, sticky="w", pady=6)
+        tipo_combo_edit = ttk.Combobox(frame, textvariable=e_tipo, values=["Entrada", "Saída"], state="readonly", width=37)
+        tipo_combo_edit.grid(row=1, column=1, pady=6)
+
+        ttk.Label(frame, text="Categoria:").grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Entry(frame, textvariable=e_cat, width=40).grid(row=2, column=1, pady=6)
+
+        ttk.Label(frame, text="Valor:").grid(row=3, column=0, sticky="w", pady=6)
+        ttk.Entry(frame, textvariable=e_val, width=40).grid(row=3, column=1, pady=6)
+
+        ttk.Label(frame, text="Descrição:").grid(row=4, column=0, sticky="w", pady=6)
+        ttk.Entry(frame, textvariable=e_desc, width=40).grid(row=4, column=1, pady=6)
+
+        ttk.Label(frame, text="Observação:").grid(row=5, column=0, sticky="w", pady=6)
+        ttk.Entry(frame, textvariable=e_obs, width=40).grid(row=5, column=1, pady=6)
 
         def salvar():
             v_str = e_val.get().strip().replace(".", "").replace(",", ".")
@@ -391,7 +398,6 @@ class AppFluxoCaixa:
             novos_vals = (e_data.get(), e_tipo.get(), e_cat.get(), v_fmt, e_desc.get(), e_obs.get())
 
             self.fazer_backup()
-            # Atualizar na lista mestra
             for i, (dados, _) in enumerate(self._todos_dados):
                 if dados == vals_atuais:
                     self._todos_dados[i] = (novos_vals, (tag,))
@@ -409,18 +415,14 @@ class AppFluxoCaixa:
         if not selecionado:
             messagebox.showwarning("Aviso", "Selecione um lançamento")
             return
-
         vals_excluir = self.tabela.item(selecionado[0], "values")
-
         if messagebox.askyesno("Confirmação", "Excluir este lançamento?\nBackup será feito."):
             self.fazer_backup()
-            # Remover da lista mestra
             self._todos_dados = [(d, t) for d, t in self._todos_dados if d != vals_excluir]
             self.salvar_dados_csv()
             self.aplicar_filtros()
 
     def gerar_extrato_filtrado(self):
-        """Mostra na tela SOMENTE os dados que estão filtrados"""
         itens = self.tabela.get_children()
         if not itens:
             messagebox.showwarning("Aviso", "Sem dados para exibir — ajuste os filtros")
@@ -428,7 +430,7 @@ class AppFluxoCaixa:
 
         janela = tk.Toplevel(self.root)
         janela.title("📄 EXTRATO FILTRADO")
-        janela.geometry("1050x700")
+        janela.geometry("1100x700")
 
         periodo_txt = "PERÍODO: "
         if self.filtro_data_inicio.get():
@@ -454,7 +456,7 @@ class AppFluxoCaixa:
             elif c == "Data":
                 tree.column(c, width=160, anchor="center")
             else:
-                tree.column(c, width=220, anchor="w")
+                tree.column(c, width=250, anchor="w")
 
         scroll = ttk.Scrollbar(frame_tab, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=scroll.set)
@@ -489,7 +491,6 @@ class AppFluxoCaixa:
 
         rodape = ttk.Frame(janela, padding=20)
         rodape.pack(fill="x")
-
         tk.Label(rodape, text=f"📈 TOTAL DE ENTRADAS: R$ {total_ent:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
                  font=("Helvetica", 11, "bold"), fg="#27ae60").pack(anchor="w")
         tk.Label(rodape, text=f"📉 TOTAL DE SAÍDAS: R$ {total_sai:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
@@ -498,13 +499,11 @@ class AppFluxoCaixa:
                  font=("Helvetica", 14, "bold"), fg="#27ae60" if saldo >= 0 else "#e74c3c").pack(anchor="w", pady=8)
 
     def gerar_pdf_filtrado(self):
-        """Gera PDF SOMENTE com os dados filtrados na tela"""
         itens = self.tabela.get_children()
         if not itens:
             messagebox.showwarning("Aviso", "Sem dados para gerar PDF — ajuste os filtros")
             return
 
-        # Montar nome do arquivo com período
         data_agora = datetime.now().strftime("%Y%m%d_%H%M%S")
         periodo_nome = ""
         if self.filtro_data_inicio.get():
@@ -527,7 +526,6 @@ class AppFluxoCaixa:
             elementos = []
             estilos = getSampleStyleSheet()
 
-            # Título
             titulo = ParagraphStyle("Titulo", parent=estilos["Heading1"], fontSize=18, alignment=1,
                                     textColor=colors.HexColor("#2c3e50"), spaceAfter=6)
             subtitulo = ParagraphStyle("Sub", parent=estilos["Normal"], fontSize=11, alignment=1,
@@ -553,7 +551,6 @@ class AppFluxoCaixa:
             elementos.append(Paragraph(f"Emitido em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", rodape_estilo))
             elementos.append(Spacer(1, 15))
 
-            # Tabela
             cel = ParagraphStyle("Cel", parent=estilos["Normal"], fontSize=9, leading=11)
             cab = ParagraphStyle("Cab", parent=estilos["Normal"], fontSize=10, fontName="Helvetica-Bold",
                                   textColor=colors.whitesmoke, alignment=1)
@@ -563,7 +560,7 @@ class AppFluxoCaixa:
                 vals = self.tabela.item(linha, "values")
                 dados.append([Paragraph(str(v), cel) for v in vals])
 
-            tabela = Table(dados, colWidths=[120, 90, 150, 110, 220, 120])
+            tabela = Table(dados, colWidths=[120, 90, 250, 110, 220, 120])
             tabela.setStyle(TableStyle([
                 ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#2c3e50")),
                 ("ALIGN", (0,0), (-1,-1), "CENTER"),
@@ -575,7 +572,6 @@ class AppFluxoCaixa:
             elementos.append(tabela)
             elementos.append(Spacer(1, 25))
 
-            # Resumo do período
             ent, sai, saldo = self.calcular_totais_tabela()
             resumo = ParagraphStyle("Resumo", parent=estilos["Normal"], fontSize=12, fontName="Helvetica-Bold", spaceAfter=8)
             cor_saldo = "#27ae60" if saldo >= 0 else "#e74c3c"
