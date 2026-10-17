@@ -1,4 +1,4 @@
-Data,Tipo,Categoria,Valor,Descrição,Observação,Conta
+Data,Conta,Tipo,Categoria,Valor,Descrição,Observação
 30/07/2026 03:35,Entrada,Férias,"R$ 7.033,70",AG.3409 C.C 02008934-0,FERIAS 20 DIAS AGOSTO 2026 E 10 TRABALHADOS,Geral
 30/07/2026 08:37,Saída,Saída,"R$ 21,47",[FERIAS] - PADARIA,OLIVETANOS,Geral
 30/07/2026 10:10,Saída,Saída,"R$ 220,00",[FERIAS] - DENTISTA,,Geral
@@ -155,3 +155,4 @@ Data,Tipo,Categoria,Valor,Descrição,Observação,Conta
 06/10/2026 09:00,Saída,Transferência Poupança,"R$ 1.050,00",[3409.60.082724-7] - LIQUIDO PAGAMENTO SETEMBRO,POS DESPESAS,Geral
 07/10/2026 10:51,Entrada,Resgate Poupança,"R$ 400,00",[3409.60.083398-1] - Resgate da 3409.60.083398-1,VACINAS MEL E MILU,Geral
 07/10/2026 10:52,Saída,Saída,"R$ 400,00",[DESPESAS DIVERSAS] - PIX ENVIADO CLINICA,VETERINARIA,Geral
+20/10/2026,Geral,Entrada,Disponível em Conta Corrente,"R$ 1.535,21",Adiantamento vale outubro 2026,2026
