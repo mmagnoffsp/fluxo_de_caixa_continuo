@@ -18,7 +18,7 @@ class AppFluxoCaixa:
         self.root.title("💰 Fluxo de Caixa - Contas e Poupanças")
         
         largura_janela = 1280
-        altura_janela = 850
+        altura_janela = 880
         largura_tela = self.root.winfo_screenwidth()
         altura_tela = self.root.winfo_screenheight()
         pos_x = (largura_tela // 2) - (largura_janela // 2)
@@ -35,9 +35,10 @@ class AppFluxoCaixa:
         self.data_var = tk.StringVar(value=datetime.now().strftime("%d/%m/%Y %H:%M"))
         self.descricao_var = tk.StringVar()
         self.obs_var = tk.StringVar()
-        self.conta_var = tk.StringVar()
+        self.conta_var = tk.StringVar(value="Conta Corrente")
         
-        # Variáveis para o filtro por data
+        # Variáveis para os filtros
+        self.filtro_conta_var = tk.StringVar(value="Todas")
         self.filtro_data_inicio = tk.StringVar()
         self.filtro_data_fim = tk.StringVar()
         
@@ -74,7 +75,7 @@ class AppFluxoCaixa:
                             self._todos_dados.append((vals, (tag,)))
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao carregar dados:\n{e}")
-        self.aplicar_filtro_data()
+        self.aplicar_filtros()
 
     def salvar_dados_csv(self):
         try:
@@ -86,7 +87,7 @@ class AppFluxoCaixa:
             messagebox.showerror("Erro", f"Erro ao salvar dados:\n{e}")
 
     def obter_lista_contas(self):
-        contas = set()
+        contas = {"Conta Corrente", "Poupança"}
         for vals, _ in self._todos_dados:
             if len(vals) >= 7 and vals[1].strip():
                 contas.add(vals[1].strip())
@@ -100,16 +101,15 @@ class AppFluxoCaixa:
         header_frame.pack(fill="x")
         tk.Label(header_frame, text="💰 CONTROLE DE FLUXO DE CAIXA", 
                  font=("Helvetica", 16, "bold"), fg="white", bg="#2c3e50").pack()
-        tk.Label(header_frame, text="Gerenciamento de Lançamentos e Extratos", 
+        tk.Label(header_frame, text="Gerenciamento Separado de Conta Corrente e Poupança", 
                  font=("Helvetica", 9), fg="#bdc3c7", bg="#2c3e50").pack()
 
         form_frame = ttk.LabelFrame(self.root, text="📝 Novo Lançamento e Ações")
         form_frame.pack(fill="x", padx=15, pady=5)
 
-        ttk.Label(form_frame, text="Conta Corrente/Poupança:").grid(row=0, column=0, sticky="w", padx=6, pady=4)
-        self.conta_combo = ttk.Combobox(form_frame, textvariable=self.conta_var, width=32)
+        ttk.Label(form_frame, text="Conta:").grid(row=0, column=0, sticky="w", padx=6, pady=4)
+        self.conta_combo = ttk.Combobox(form_frame, textvariable=self.conta_var, values=["Conta Corrente", "Poupança"], width=28, state="readonly")
         self.conta_combo.grid(row=0, column=1, padx=6, pady=4, sticky="w")
-        ttk.Label(form_frame, text="(deixe vazio = Geral)").grid(row=0, column=2, sticky="w", padx=0, pady=4)
 
         ttk.Label(form_frame, text="Data/Hora:").grid(row=1, column=0, sticky="w", padx=6, pady=4)
         ttk.Entry(form_frame, textvariable=self.data_var, width=20).grid(row=1, column=1, padx=6, pady=4, sticky="w")
@@ -133,16 +133,21 @@ class AppFluxoCaixa:
         ttk.Label(form_frame, text="Observação:").grid(row=3, column=0, sticky="w", padx=6, pady=4)
         ttk.Entry(form_frame, textvariable=self.obs_var, width=42).grid(row=3, column=1, columnspan=3, padx=6, pady=4, sticky="w")
 
-        # Linha de Filtro por Data integrada na parte inferior do painel de ações
-        filtro_data_frame = ttk.Frame(form_frame)
-        filtro_data_frame.grid(row=4, column=0, columnspan=6, sticky="w", padx=6, pady=4)
+        # Linha de Filtros (Conta + Período)
+        filtro_frame = ttk.Frame(form_frame)
+        filtro_frame.grid(row=4, column=0, columnspan=6, sticky="w", padx=6, pady=6)
         
-        ttk.Label(filtro_data_frame, text="📅 Filtrar Período — Início:").pack(side="left", padx=(0, 2))
-        ttk.Entry(filtro_data_frame, textvariable=self.filtro_data_inicio, width=12).pack(side="left", padx=2)
-        ttk.Label(filtro_data_frame, text="Até:").pack(side="left", padx=5)
-        ttk.Entry(filtro_data_frame, textvariable=self.filtro_data_fim, width=12).pack(side="left", padx=2)
-        ttk.Button(filtro_data_frame, text="🔍 Filtrar", command=self.aplicar_filtro_data).pack(side="left", padx=8)
-        ttk.Button(filtro_data_frame, text="🔄 Limpar Filtro", command=self.limpar_filtro_data).pack(side="left", padx=2)
+        ttk.Label(filtro_frame, text="🔍 Filtrar Conta:").pack(side="left", padx=(0, 2))
+        self.filtro_conta_combo = ttk.Combobox(filtro_frame, textvariable=self.filtro_conta_var, values=["Todas", "Conta Corrente", "Poupança"], width=18, state="readonly")
+        self.filtro_conta_combo.pack(side="left", padx=2)
+        self.filtro_conta_combo.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
+
+        ttk.Label(filtro_frame, text="  📅 Início:").pack(side="left", padx=(5, 2))
+        ttk.Entry(filtro_frame, textvariable=self.filtro_data_inicio, width=12).pack(side="left", padx=2)
+        ttk.Label(filtro_frame, text="Até:").pack(side="left", padx=5)
+        ttk.Entry(filtro_frame, textvariable=self.filtro_data_fim, width=12).pack(side="left", padx=2)
+        ttk.Button(filtro_frame, text="🔍 Filtrar", command=self.aplicar_filtros).pack(side="left", padx=8)
+        ttk.Button(filtro_frame, text="🔄 Limpar Filtros", command=self.limpar_filtros).pack(side="left", padx=2)
 
         # Botões principais
         btn_form = ttk.Frame(form_frame)
@@ -166,7 +171,7 @@ class AppFluxoCaixa:
             if col == "Data":
                 self.tabela.column(col, width=140, anchor="center")
             elif col == "Conta":
-                self.tabela.column(col, width=170, anchor="w")
+                self.tabela.column(col, width=150, anchor="w")
             elif col == "Tipo":
                 self.tabela.column(col, width=90, anchor="center")
             elif col == "Categoria":
@@ -174,9 +179,9 @@ class AppFluxoCaixa:
             elif col == "Valor":
                 self.tabela.column(col, width=120, anchor="e")
             elif col == "Descrição":
-                self.tabela.column(col, width=260, anchor="w")
+                self.tabela.column(col, width=250, anchor="w")
             elif col == "Observação":
-                self.tabela.column(col, width=230, anchor="w")
+                self.tabela.column(col, width=210, anchor="w")
 
         scroll = ttk.Scrollbar(tabela_frame, orient="vertical", command=self.tabela.yview)
         self.tabela.configure(yscrollcommand=scroll.set)
@@ -199,16 +204,58 @@ class AppFluxoCaixa:
         self.lbl_status.pack(anchor="w")
 
     def atualizar_categorias(self, event=None):
-        cats_entrada = ["Disponível em Conta Corrente", "Salário", "13º Salário - 1ª Parcela", "13º Salário - 2ª Parcela", "Férias", "Pagamento antes das Férias", "Pagamento após das Férias", "Adiantamento", "Vale", "Vale após as Férias", "Resgate Poupança", "Rendimento", "Resgate", "Reembolso", "Venda", "Outras Receitas"]
-        cats_saida = ["Disponível em Conta Corrente", "Pagamento", "Adiantamento", "Vale", "Vale após as Férias", "13º Salário - 1ª Parcela", "13º Salário - 2ª Parcela", "Férias", "Pagamento antes das Férias", "Pagamento após das Férias", "Transferência Poupança", "Moradia", "Alimentação", "Transporte", "Saúde", "Educação", "Lazer", "Cartão", "Empréstimo", "Contas", "Outras Despesas"]
+        conta_atual = self.conta_var.get()
+        
+        if conta_atual == "Poupança":
+            cats_entrada = [
+                "Disponível em Poupança", 
+                "Entrada na Poupança (Depósito)", 
+                "Rendimento de Poupança", 
+                "Resgate para Conta Corrente", 
+                "Outras Receitas Poupança"
+            ]
+            cats_saida = [
+                "Disponível em Poupança", 
+                "Saída da Poupança (Retirada)", 
+                "Transferência para Conta Corrente", 
+                "Outras Despesas Poupança"
+            ]
+        else:
+            cats_entrada = [
+                "Disponível em Conta Corrente", 
+                "Salário", 
+                "13º Salário - 1ª Parcela", 
+                "13º Salário - 2ª Parcela", 
+                "Férias", 
+                "Adiantamento", 
+                "Vale", 
+                "Rendimento", 
+                "Resgate", 
+                "Reembolso", 
+                "Venda", 
+                "Outras Receitas"
+            ]
+            cats_saida = [
+                "Disponível em Conta Corrente", 
+                "Pagamento", 
+                "Adiantamento", 
+                "Transferência para Poupança", 
+                "Moradia", 
+                "Alimentação", 
+                "Transporte", 
+                "Saúde", 
+                "Educação", 
+                "Lazer", 
+                "Cartão", 
+                "Empréstimo", 
+                "Contas", 
+                "Outras Despesas"
+            ]
         
         cats = cats_entrada if self.tipo_var.get() == "Entrada" else cats_saida
         self.cat_combo['values'] = cats
         if not self.categoria_var.get() or self.categoria_var.get() not in cats:
             self.categoria_var.set(cats[0])
-            
-        lista_contas = self.obter_lista_contas()
-        self.conta_combo['values'] = [""] + lista_contas
 
     def _parse_data(self, texto_data):
         try:
@@ -219,10 +266,11 @@ class AppFluxoCaixa:
         except ValueError:
             return None
 
-    def aplicar_filtro_data(self):
+    def aplicar_filtros(self):
         for linha in self.tabela.get_children():
             self.tabela.delete(linha)
 
+        conta_filtro = self.filtro_conta_var.get()
         d_ini_txt = self.filtro_data_inicio.get().strip()
         d_fim_txt = self.filtro_data_fim.get().strip()
 
@@ -234,33 +282,65 @@ class AppFluxoCaixa:
         qtd = 0
         for vals, tags in self._todos_dados:
             data_reg = self._parse_data(vals[0])
+            conta_reg = vals[1]
+
+            # Filtro por Conta
+            if conta_filtro != "Todas" and conta_reg != conta_filtro:
+                continue
+
+            # Filtro por Data
             if data_reg:
                 if d_ini and data_reg < d_ini:
                     continue
                 if d_fim and data_reg > d_fim:
                     continue
+
             self.tabela.insert("", "end", values=vals, tags=tags)
             qtd += 1
 
         status = f"✅ Exibindo {qtd} registro(s)"
+        detalhes = []
+        if conta_filtro != "Todas":
+            detalhes.append(f"Conta: {conta_filtro}")
         if d_ini_txt or d_fim_txt:
-            status += " (FILTRADO POR PERÍODO)"
+            detalhes.append("Período Filtrado")
+        
+        if detalhes:
+            status += f" ({' | '.join(detalhes)})"
+
         self.lbl_status.config(text=status)
         self.atualizar_saldo_exibicao()
-        
-        lista_contas = self.obter_lista_contas()
-        self.conta_combo['values'] = [""] + lista_contas
 
-    def limpar_filtro_data(self):
+    def limpar_filtros(self):
+        self.filtro_conta_var.set("Todas")
         self.filtro_data_inicio.set("")
         self.filtro_data_fim.set("")
-        self.aplicar_filtro_data()
+        self.aplicar_filtros()
 
     def calcular_totais(self):
         entradas = 0.0
         saidas = 0.0
+        conta_filtro = self.filtro_conta_var.get()
+        d_ini_txt = self.filtro_data_inicio.get().strip()
+        d_fim_txt = self.filtro_data_fim.get().strip()
+        d_ini = self._parse_data(d_ini_txt) if d_ini_txt else None
+        d_fim = self._parse_data(d_fim_txt) if d_fim_txt else None
+        if d_fim and len(d_fim_txt) <= 10:
+            d_fim = d_fim.replace(hour=23, minute=59, second=59)
+
         for vals, _ in self._todos_dados:
             try:
+                data_reg = self._parse_data(vals[0])
+                conta_reg = vals[1]
+
+                if conta_filtro != "Todas" and conta_reg != conta_filtro:
+                    continue
+                if data_reg:
+                    if d_ini and data_reg < d_ini:
+                        continue
+                    if d_fim and data_reg > d_fim:
+                        continue
+
                 tipo = vals[2]
                 val_str = vals[4].replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
                 valor = float(val_str)
@@ -279,7 +359,7 @@ class AppFluxoCaixa:
         self.lbl_saldo.config(text=f"💰 SALDO ATUAL: {self.formatar_valor(saldo)}", fg="#27ae60" if saldo >= 0 else "#e74c3c")
 
     def adicionar_registro(self):
-        conta = self.conta_var.get().strip() or "Geral"
+        conta = self.conta_var.get().strip() or "Conta Corrente"
         data = self.data_var.get().strip() or datetime.now().strftime("%d/%m/%Y %H:%M")
         tipo = self.tipo_var.get()
         cat = self.categoria_var.get()
@@ -306,7 +386,7 @@ class AppFluxoCaixa:
         self.fazer_backup()
         self._todos_dados.append((vals, (tag,)))
         self.salvar_dados_csv()
-        self.aplicar_filtro_data()
+        self.aplicar_filtros()
 
         self.valor_var.set("")
         self.descricao_var.set("")
@@ -340,8 +420,8 @@ class AppFluxoCaixa:
         ttk.Label(frame, text="Data/Hora:").grid(row=0, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=e_data, width=42).grid(row=0, column=1, pady=5, sticky="w")
         
-        ttk.Label(frame, text="Conta Corrente/Poupança:").grid(row=1, column=0, sticky="w", pady=5)
-        ttk.Entry(frame, textvariable=e_conta, width=42).grid(row=1, column=1, pady=5, sticky="w")
+        ttk.Label(frame, text="Conta:").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Combobox(frame, textvariable=e_conta, values=["Conta Corrente", "Poupança"], width=40, state="readonly").grid(row=1, column=1, pady=5, sticky="w")
         
         ttk.Label(frame, text="Tipo:").grid(row=2, column=0, sticky="w", pady=5)
         ttk.Combobox(frame, textvariable=e_tipo, values=["Entrada", "Saída"], state="readonly", width=40).grid(row=2, column=1, pady=5, sticky="w")
@@ -377,7 +457,7 @@ class AppFluxoCaixa:
                     self._todos_dados[i] = (novos_vals, (tag,))
                     break
             self.salvar_dados_csv()
-            self.aplicar_filtro_data()
+            self.aplicar_filtros()
             messagebox.showinfo("Sucesso", "Alterações salvas!", parent=ja)
             ja.destroy()
 
@@ -393,7 +473,7 @@ class AppFluxoCaixa:
             self.fazer_backup()
             self._todos_dados = [(d, t) for d, t in self._todos_dados if d != vals_excluir]
             self.salvar_dados_csv()
-            self.aplicar_filtro_data()
+            self.aplicar_filtros()
 
     def gerar_extrato(self):
         itens = self.tabela.get_children()
@@ -402,7 +482,7 @@ class AppFluxoCaixa:
             return
 
         janela = tk.Toplevel(self.root)
-        titulo = "📄 EXTRATO"
+        titulo = f"📄 EXTRATO - {self.filtro_conta_var.get().upper()}"
         janela.title(titulo)
         janela.geometry("1100x700")
 
@@ -477,7 +557,7 @@ class AppFluxoCaixa:
         caminho = filedialog.asksaveasfilename(
             defaultextension=".pdf",
             filetypes=[("PDF", "*.pdf"), ("Todos", "*.*")],
-            initialfile=f"extrato_{data_agora}.pdf",
+            initialfile=f"extrato_{self.filtro_conta_var.get().lower()}_{data_agora}.pdf",
             title="Salvar PDF"
         )
         if not caminho:
@@ -488,7 +568,7 @@ class AppFluxoCaixa:
             elementos = []
             estilos = getSampleStyleSheet()
 
-            titulo_texto = "EXTRATO DE LANÇAMENTOS"
+            titulo_texto = f"EXTRATO DE LANÇAMENTOS - {self.filtro_conta_var.get().upper()}"
             titulo = ParagraphStyle("Titulo", parent=estilos["Heading1"], fontSize=18, alignment=1, textColor=colors.HexColor("#2c3e50"), spaceAfter=6)
             subtitulo = ParagraphStyle("Sub", parent=estilos["Normal"], fontSize=11, alignment=1, textColor=colors.HexColor("#3498db"), spaceAfter=6)
             rodape_estilo = ParagraphStyle("Rodape", parent=estilos["Normal"], fontSize=9, alignment=1, textColor=colors.grey)
